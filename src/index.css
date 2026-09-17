@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/* Manual light/dark toggle: `dark:` variants apply when an ancestor has the `dark` class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* San Francisco has no freely-licensed webfont file; -apple-system / BlinkMacSystemFont
+     resolve to it natively on macOS, iOS and Safari/Chrome, falling back to the platform's
+     default UI font elsewhere. */
+  --font-sf: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui,
+    sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+body {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
