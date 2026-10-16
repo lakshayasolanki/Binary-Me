@@ -15,6 +15,9 @@ import {
 } from "./binaryRenderer";
 
 const DEBUG_MASK_COLOR = "#ff00ff";
+/** How much the halo (the outer outline) brightens at full hover. On a light backdrop the
+ *  halo multiplies, so it is darkened instead to read stronger. */
+const HALO_HOVER_GAIN = 0.6;
 
 export interface BinaryCharacterProps extends BinaryFieldOptions {
   className?: string;
@@ -51,6 +54,7 @@ export function BinaryCharacter({
   opacity,
   opacityVariance,
   binaryColor,
+  glowIntensity = 1,
   direction,
   theme = "dark",
   debugMask = false,
@@ -65,6 +69,13 @@ export function BinaryCharacter({
   const glowCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const debugCanvasRef = useRef<HTMLCanvasElement>(null);
+  // Color lives outside the main effect's deps: a change recolors the running field in place
+  // (see the effect below it) instead of tearing it down and restarting every stream.
+  const colorRef = useRef(binaryColor ?? DEFAULT_BINARY_COLOR);
+  const recolorRef = useRef<((hex: string) => void) | null>(null);
+  // Same idea for glow strength: adjusted live, never a restart.
+  const glowIntensityRef = useRef(glowIntensity);
+  const controllerRef = useRef<BinaryFieldController | null>(null);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -83,12 +94,17 @@ export function BinaryCharacter({
       lineHeight,
       opacity,
       opacityVariance,
-      binaryColor,
+      binaryColor: colorRef.current,
+      glowIntensity: glowIntensityRef.current,
       direction,
       theme,
+    }, (amount) => {
+      const level = theme === "light" ? 1 - (HALO_HOVER_GAIN / 2) * amount : 1 + HALO_HOVER_GAIN * amount;
+      glowCanvas.style.filter = amount > 0 ? `brightness(${level})` : "";
     });
 
     let maskBounds: Bounds | null = null;
+    let haloLayout: { cssWidth: number; cssHeight: number; bounds: Bounds } | null = null;
     let cancelled = false;
     const backingCtx = backingCanvas.getContext("2d");
     const glowCtx = glowCanvas.getContext("2d");
@@ -106,6 +122,18 @@ export function BinaryCharacter({
       maskBounds = computeMaskBounds(maskImage);
       applyLayout();
     }
+
+    function drawHalo() {
+      if (!glowCtx || !haloLayout) return;
+      const { cssWidth, cssHeight, bounds } = haloLayout;
+      renderHalo(glowCtx, maskImage, cssWidth, cssHeight, bounds, colorRef.current, theme);
+    }
+
+    controllerRef.current = controller;
+    recolorRef.current = (hex) => {
+      controller.setColor(hex);
+      drawHalo();
+    };
 
     function applyLayout() {
       if (!maskBounds || !wrapper || !backingCanvas || !glowCanvas || !canvas || !debugCanvas) return;
@@ -141,7 +169,8 @@ export function BinaryCharacter({
       glowCanvas.height = canvas.height;
       if (glowCtx) {
         glowCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        renderHalo(glowCtx, maskImage, cssWidth, cssHeight, scaledBounds, binaryColor ?? DEFAULT_BINARY_COLOR, theme);
+        haloLayout = { cssWidth, cssHeight, bounds: scaledBounds };
+        drawHalo();
       }
 
       debugCanvas.width = canvas.width;
@@ -155,11 +184,26 @@ export function BinaryCharacter({
     const resizeObserver = new ResizeObserver(() => applyLayout());
     resizeObserver.observe(wrapper);
 
+    function handlePointerMove(event: PointerEvent) {
+      const rect = wrapper!.getBoundingClientRect();
+      controller.setPointer(event.clientX - rect.left, event.clientY - rect.top);
+    }
+    function handlePointerLeave() {
+      controller.setPointer(null);
+    }
+    wrapper.addEventListener("pointermove", handlePointerMove);
+    wrapper.addEventListener("pointerleave", handlePointerLeave);
+
     controller.start();
 
     return () => {
       cancelled = true;
+      recolorRef.current = null;
+      controllerRef.current = null;
+      glowCanvas.style.filter = "";
       resizeObserver.disconnect();
+      wrapper.removeEventListener("pointermove", handlePointerMove);
+      wrapper.removeEventListener("pointerleave", handlePointerLeave);
       controller.destroy();
     };
   }, [
@@ -171,10 +215,21 @@ export function BinaryCharacter({
     lineHeight,
     opacity,
     opacityVariance,
-    binaryColor,
     direction,
     theme,
   ]);
+
+  useEffect(() => {
+    const hex = binaryColor ?? DEFAULT_BINARY_COLOR;
+    if (hex === colorRef.current) return;
+    colorRef.current = hex;
+    recolorRef.current?.(hex);
+  }, [binaryColor]);
+
+  useEffect(() => {
+    glowIntensityRef.current = glowIntensity;
+    controllerRef.current?.setGlowIntensity(glowIntensity);
+  }, [glowIntensity]);
 
   return (
     <div

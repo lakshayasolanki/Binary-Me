@@ -36,6 +36,9 @@ export interface BinaryFieldOptions {
   /** Background the field sits on. Flips the brightness->lightness ramp so "hot" glyphs
    *  stay high-contrast against either a black or a white backdrop instead of washing out. */
   theme?: "light" | "dark";
+  /** Strength multiplier for the hover glow (digit lift, edge rim, halo). 0 turns it off,
+   *  1 is the default look, 2 doubles it. */
+  glowIntensity?: number;
 }
 
 type ResolvedOptions = Required<BinaryFieldOptions>;
@@ -52,6 +55,7 @@ const DEFAULT_OPTIONS: Omit<ResolvedOptions, "streamCount"> & { streamCount: num
   binaryColor: "#166534",
   direction: "up",
   theme: "dark",
+  glowIntensity: 1,
 };
 
 export const DEFAULT_BINARY_COLOR = DEFAULT_OPTIONS.binaryColor;
@@ -569,6 +573,14 @@ export interface BinaryFieldController {
    *  destination-in clip (see draw()) blits a ready bitmap instead of rescaling the source
    *  image each time. Call whenever the field's CSS size changes, alongside setBounds. */
   setMask(maskImage: HTMLImageElement, cssWidth: number, cssHeight: number): void;
+  /** Swaps the glyph palette (and the edge-rim tint derived from it) in place, so a color
+   *  change never restarts the streams. */
+  setColor(hex: string): void;
+  /** Changes the hover glow strength live (see BinaryFieldOptions.glowIntensity). */
+  setGlowIntensity(intensity: number): void;
+  /** Cursor position in CSS px relative to the field, or null once it leaves. Drives the
+   *  hover spotlight, which only lights up while the point is over the silhouette itself. */
+  setPointer(x: number | null, y?: number): void;
   destroy(): void;
 }
 
@@ -579,9 +591,32 @@ const EDGE_RIM_DEPTH_RATIO = 0.012;
  *  `source-atop`, so it only ever brightens existing glyph pixels, never fills a gap. */
 const EDGE_RIM_TINT_ALPHA = 0.35;
 
+/** How far up the brightness ramp every glyph is nudged while hovered — a slight lift, so
+ *  each glyph stays on its own shade instead of the field flattening toward the top. */
+const HOVER_BRIGHTNESS_BOOST = 0.12;
+/** Around the cursor the lift is eased off by up to this fraction (full dip right under it,
+ *  none past HOVER_DIP_RADIUS_RATIO), so the pointer sits in a barely-dimmer pocket. */
+const HOVER_POINTER_DIP = 0.35;
+/** Radius of that pocket, as a fraction of the silhouette's height. */
+const HOVER_DIP_RADIUS_RATIO = 0.3;
+/** Time constants (seconds) for the glow fading in/out and its focus trailing the cursor. */
+const SPOTLIGHT_FADE_TAU = 0.12;
+const SPOTLIGHT_FOLLOW_TAU = 0.06;
+/** Mask alpha (0-255) above which a pixel counts as "on the silhouette" for hover. */
+const HOVER_ALPHA_THRESHOLD = 128;
+/** Edge-rim tint strength at full hover (EDGE_RIM_TINT_ALPHA at rest), so the inner outline
+ *  brightens along with the glyphs. */
+const EDGE_RIM_HOVER_ALPHA = 0.65;
+
+/**
+ * `onHoverChange`, if given, is called with the effective glow amount (eased 0-1 hover times
+ * glowIntensity) whenever it moves, so layers the field doesn't own (the halo canvas) can
+ * brighten in step with it.
+ */
 export function createBinaryField(
   canvas: HTMLCanvasElement,
   options: BinaryFieldOptions = {},
+  onHoverChange?: (amount: number) => void,
 ): BinaryFieldController {
   const ctx = canvas.getContext("2d");
   const definedOptions = Object.fromEntries(
@@ -593,7 +628,8 @@ export function createBinaryField(
   } as ResolvedOptions;
 
   const classConfig = buildClassConfig(resolved.opacityVariance);
-  const palette = buildPalette(resolved.binaryColor, resolved.theme);
+  let palette = buildPalette(resolved.binaryColor, resolved.theme);
+  let lastMask: { image: HTMLImageElement; cssWidth: number; cssHeight: number } | null = null;
 
   let bounds: Bounds = { x: 0, y: 0, width: 0, height: 0 };
   let layout: Layout = EMPTY_LAYOUT;
@@ -601,6 +637,11 @@ export function createBinaryField(
   let lastTime = 0;
   let maskCanvas: HTMLCanvasElement | null = null;
   let edgeRimCanvas: HTMLCanvasElement | null = null;
+  let maskAlpha: { data: Uint8ClampedArray; width: number; height: number } | null = null;
+
+  let pointer: { x: number; y: number } | null = null;
+  let spot = { x: 0, y: 0 };
+  let hover = 0;
 
   function setBounds(newBounds: Bounds, scale: number) {
     bounds = newBounds;
@@ -608,6 +649,7 @@ export function createBinaryField(
   }
 
   function setMask(maskImage: HTMLImageElement, cssWidth: number, cssHeight: number) {
+    lastMask = { image: maskImage, cssWidth, cssHeight };
     const w = Math.max(1, Math.round(cssWidth));
     const h = Math.max(1, Math.round(cssHeight));
     if (!maskCanvas) maskCanvas = document.createElement("canvas");
@@ -617,6 +659,11 @@ export function createBinaryField(
     if (!mctx) return;
     mctx.clearRect(0, 0, w, h);
     mctx.drawImage(maskImage, 0, 0, w, h);
+    // Cached once per layout so hover hit-testing is a single array lookup per frame.
+    const pixels = mctx.getImageData(0, 0, w, h).data;
+    const alpha = new Uint8ClampedArray(w * h);
+    for (let i = 0; i < alpha.length; i++) alpha[i] = pixels[i * 4 + 3];
+    maskAlpha = { data: alpha, width: w, height: h };
 
     // Inner edge rim: the sharp mask, tinted, minus a blurred copy of itself. Deep in the
     // interior the blur ≈ the sharp mask (surrounded by silhouette on every side within the
@@ -650,7 +697,54 @@ export function createBinaryField(
     }
   }
 
+  function setGlowIntensity(intensity: number) {
+    if (intensity === resolved.glowIntensity) return;
+    resolved.glowIntensity = intensity;
+    if (hover > 0) onHoverChange?.(hover * intensity);
+  }
+
+  function setColor(hex: string) {
+    if (hex === resolved.binaryColor) return;
+    resolved.binaryColor = hex;
+    palette = buildPalette(hex, resolved.theme);
+    // The edge rim is baked with the glow color, so it has to be re-tinted too.
+    if (lastMask) setMask(lastMask.image, lastMask.cssWidth, lastMask.cssHeight);
+  }
+
+  function setPointer(x: number | null, y = 0) {
+    pointer = x == null ? null : { x, y };
+  }
+
+  function isOverSilhouette(x: number, y: number): boolean {
+    if (!maskAlpha) return false;
+    const px = Math.floor(x);
+    const py = Math.floor(y);
+    if (px < 0 || py < 0 || px >= maskAlpha.width || py >= maskAlpha.height) return false;
+    return maskAlpha.data[py * maskAlpha.width + px] >= HOVER_ALPHA_THRESHOLD;
+  }
+
+  function updateSpotlight(dt: number) {
+    const active = pointer != null && isOverSilhouette(pointer.x, pointer.y);
+    if (pointer) {
+      if (hover < 0.01) {
+        // Fading in from nothing: start at the cursor instead of sliding over from the last spot.
+        spot = { ...pointer };
+      } else {
+        const follow = 1 - Math.exp(-dt / SPOTLIGHT_FOLLOW_TAU);
+        spot.x += (pointer.x - spot.x) * follow;
+        spot.y += (pointer.y - spot.y) * follow;
+      }
+    }
+    const fade = 1 - Math.exp(-dt / SPOTLIGHT_FADE_TAU);
+    const previous = hover;
+    hover += ((active ? 1 : 0) - hover) * fade;
+    if (hover < 0.001) hover = 0;
+    if (hover > 0.999) hover = 1;
+    if (hover !== previous) onHoverChange?.(hover * resolved.glowIntensity);
+  }
+
   function update(dt: number) {
+    updateSpotlight(dt);
     const { columns, tileHeight } = layout;
     for (const column of columns) {
       column.offset = mod(column.offset + column.speed * dt, tileHeight);
@@ -681,6 +775,9 @@ export function createBinaryField(
 
     const lastStep = palette.steps.length - 1;
     const maxBloom = fontSizePx * 0.16;
+    const dipRadius = bounds.height * HOVER_DIP_RADIUS_RATIO;
+    const glow = hover * resolved.glowIntensity;
+    const hoverOn = glow > 0 && dipRadius > 0;
 
     for (const column of columns) {
       const glyphs = column.glyphs;
@@ -692,9 +789,16 @@ export function createBinaryField(
         const y = bounds.y - lineHeightPx + pos + lineHeightPx / 2 + glyph.dy;
         const x = column.x + glyph.dx;
 
-        const stepIndex = clamp(Math.round(glyph.brightness * lastStep), 0, lastStep);
+        let brightness = glyph.brightness;
+        if (hoverOn) {
+          const near = 1 - Math.min(1, Math.hypot(x - spot.x, y - spot.y) / dipRadius);
+          const dip = HOVER_POINTER_DIP * near * near;
+          brightness = Math.min(1, brightness + HOVER_BRIGHTNESS_BOOST * glow * (1 - dip));
+        }
+
+        const stepIndex = clamp(Math.round(brightness * lastStep), 0, lastStep);
         ctx.fillStyle = palette.steps[stepIndex];
-        const baseAlpha = clamp(0.24 + glyph.brightness * 0.78, 0.18, 1);
+        const baseAlpha = clamp(0.24 + brightness * 0.78, 0.18, 1);
         ctx.globalAlpha = clamp(baseAlpha * glyph.alphaNoise, 0.05, 1) * resolved.opacity;
 
         if (glyph.brightness > BLOOM_THRESHOLD) {
@@ -728,7 +832,7 @@ export function createBinaryField(
     // glyphs outside the thin rim (see setMask), so density/color elsewhere is untouched.
     if (edgeRimCanvas) {
       ctx.globalCompositeOperation = "source-atop";
-      ctx.globalAlpha = EDGE_RIM_TINT_ALPHA;
+      ctx.globalAlpha = Math.min(1, EDGE_RIM_TINT_ALPHA + (EDGE_RIM_HOVER_ALPHA - EDGE_RIM_TINT_ALPHA) * glow);
       ctx.drawImage(edgeRimCanvas, 0, 0);
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
@@ -763,5 +867,5 @@ export function createBinaryField(
     stop();
   }
 
-  return { start, stop, setBounds, setMask, destroy };
+  return { start, stop, setBounds, setMask, setColor, setGlowIntensity, setPointer, destroy };
 }
