@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { BinaryCharacter } from "./components/BinaryCharacter/BinaryCharacter";
 import { DEFAULT_BINARY_COLOR } from "./components/BinaryCharacter/binaryRenderer";
+import { ColorDot } from "./components/ColorDot";
 import { ColorPicker } from "./components/ColorPicker";
 import { DebugMaskToggle } from "./components/DebugMaskToggle";
 import { GlowSlider } from "./components/GlowSlider";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ThemeProvider } from "./theme/ThemeProvider";
+import { ScrambleName } from "./components/ScrambleName";
 
 const COLOR_STORAGE_KEY = "binary-color";
 const GLOW_STORAGE_KEY = "binary-glow";
@@ -60,10 +62,9 @@ function AppContent() {
         <GlowSlider value={glowIntensity} onChange={setGlowIntensity} />
       </div>
       <div className="flex w-full flex-1 items-center justify-center lg:justify-end">
-        <h1 className="font-sf flex flex-col text-6xl leading-[0.95] font-bold tracking-tight text-black transition-colors duration-300 sm:text-7xl lg:text-8xl dark:text-white">
-          <span>Lakshaya</span>
-          <span>Solanki</span>
-        </h1>
+        <ScrambleName>
+          <ColorDot value={binaryColor} onChange={setBinaryColor} />
+        </ScrambleName>
       </div>
       <div className="flex w-full flex-1 items-center justify-center lg:justify-start">
         <BinaryCharacter maxWidth={640} binaryColor={binaryColor} glowIntensity={glowIntensity} theme="dark" debugMask={debugMask} />

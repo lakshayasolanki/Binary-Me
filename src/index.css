@@ -7,6 +7,7 @@
   /* San Francisco has no freely-licensed webfont file; -apple-system / BlinkMacSystemFont
      resolve to it natively on macOS, iOS and Safari/Chrome, falling back to the platform's
      default UI font elsewhere. */
+  --font-mono-name: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --font-sf: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui,
     sans-serif;
 }
@@ -24,4 +25,61 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+
+/* A vivid mathematical palette, matching the supplied hover reference. */
+.scramble-name {
+  --scramble-violet: #9254de;
+  --scramble-blue: #497de3;
+  --scramble-teal: #299caa;
+  --scramble-green: #64a443;
+  --scramble-gold: #c89524;
+  --scramble-pink: #ce518e;
+  --scramble-coral: #d65b59;
+}
+
+/* Name set in a monospace face so every cell is the same width. */
+.scramble-line { position: relative; white-space: nowrap; font-variant-ligatures: none; font-feature-settings: "zero" 0; }
+.scramble-letter { position: relative; display: inline-block; }
+/* Trailing tracking is cancelled so each word is optically centered. */
+.scramble-word { display: inline-block; margin-right: -0.03em; }
+/* The dot hangs off the word's right edge so it never skews the centering. */
+.scramble-dot { position: absolute; left: 100%; bottom: 0; }
+.scramble-original { transition: opacity 150ms ease-out; }
+.scramble-glyph {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.56em;
+  height: 0.98em;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono-name), var(--font-sf), "STIX Two Math", "Apple Symbols", "Cambria Math", serif;
+  font-weight: 500;
+  font-size: 0.88em;
+  line-height: 1;
+  letter-spacing: 0;
+  border: 1px solid transparent;
+  border-radius: 0.2em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out;
+}
+.scramble-letter[data-active] .scramble-original { opacity: 0; }
+.scramble-letter[data-active] .scramble-glyph { opacity: 1; }
+.scramble-letter[data-boxed="true"] .scramble-glyph { border-color: currentColor; }
+.scramble-letter[data-color="violet"] .scramble-glyph { color: var(--scramble-violet); }
+.scramble-letter[data-color="blue"] .scramble-glyph { color: var(--scramble-blue); }
+.scramble-letter[data-color="teal"] .scramble-glyph { color: var(--scramble-teal); }
+.scramble-letter[data-color="green"] .scramble-glyph { color: var(--scramble-green); }
+.scramble-letter[data-color="gold"] .scramble-glyph { color: var(--scramble-gold); }
+.scramble-letter[data-color="pink"] .scramble-glyph { color: var(--scramble-pink); }
+.scramble-letter[data-color="coral"] .scramble-glyph { color: var(--scramble-coral); }
+@media (prefers-reduced-motion: reduce) {
+  .scramble-original, .scramble-glyph { transition: none; }
+  .scramble-letter[data-active] .scramble-original { opacity: 1; }
+  .scramble-letter[data-active] .scramble-glyph { opacity: 0; }
 }
