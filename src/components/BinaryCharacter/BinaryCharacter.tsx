@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import crowdUrl from "../../assets/binary-character/crowd.png";
+import reconstructionUrl from "../../assets/binary-character/reconstruction/background.png";
+import gReconstructionUrl from "../../assets/binary-character/reconstruction/G.png";
 import maskUrl from "../../assets/binary-character/person-mask.png";
 import {
   computeMaskBounds,
@@ -13,6 +15,8 @@ import {
   type BinaryFieldOptions,
   type Bounds,
 } from "./binaryRenderer";
+import { createCrowdEntrance, ENTRANCE_DURATION } from "./crowdEntrance";
+import { useCrowdFinish } from "./useCrowdFinish";
 
 const DEBUG_MASK_COLOR = "#ff00ff";
 /** How much the halo (the outer outline) brightens at full hover. On a light backdrop the
@@ -23,6 +27,8 @@ export interface BinaryCharacterProps extends BinaryFieldOptions {
   className?: string;
   /** Caps how wide the component can render; it still scales down freely below this. */
   maxWidth?: number | string;
+  /** Horizontal photographic motion residue after landing. 0 restores the sharp finish. */
+  crowdBlur?: number;
   /** Dev-only: paints person-mask.png as a flat, opaque color using the exact same
    *  drawImage-based mask compositing as the backing and digit field (see renderMaskFill), so
    *  the mask's silhouette can be checked by eye against the crowd photo underneath. Off by
@@ -31,9 +37,9 @@ export interface BinaryCharacterProps extends BinaryFieldOptions {
 }
 
 /**
- * Static crowd photograph with one silhouette running a continuously animated field of
- * binary digits. The crowd and the silhouette shape never move — only the glyphs inside
- * the silhouette do, driven by a canvas + rAF loop that never touches React state.
+ * Seven independently articulated crowd figures settle into the original photograph.
+ * The binary silhouette stays fixed throughout; only its interior glyphs keep moving.
+ * The entrance has its own short-lived renderer and never restarts for color/theme changes.
  *
  * The silhouette itself — backing, digit field, and the debug overlay — is clipped entirely
  * through canvas compositing (drawImage + `destination-in`, see renderMaskFill and
@@ -45,6 +51,7 @@ export interface BinaryCharacterProps extends BinaryFieldOptions {
 export function BinaryCharacter({
   className,
   maxWidth,
+  crowdBlur = 1,
   streamCount,
   minSpeed,
   maxSpeed,
@@ -76,6 +83,102 @@ export function BinaryCharacter({
   // Same idea for glow strength: adjusted live, never a restart.
   const glowIntensityRef = useRef(glowIntensity);
   const controllerRef = useRef<BinaryFieldController | null>(null);
+  const crowdImgRef = useRef<HTMLImageElement>(null);
+  const crowdBackRef = useRef<HTMLCanvasElement>(null);
+  const crowdFrontRef = useRef<HTMLCanvasElement>(null);
+  const { definition: finishDefinition, style: finishStyle, setTime: setFinishTime } = useCrowdFinish(crowdBlur, wrapperRef);
+  // Reveal either the prepared first pose or the still reference, so the final composition
+  // never flashes before the entrance. Normal preparation has a short, bounded deadline.
+  useEffect(() => {
+    const img = crowdImgRef.current;
+    const backCanvas = crowdBackRef.current;
+    const frontCanvas = crowdFrontRef.current;
+    const wrapper = wrapperRef.current;
+    if (!img || !backCanvas || !frontCanvas || !wrapper) return;
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const params = new URLSearchParams(window.location.search);
+    const frozen = import.meta.env.DEV ? params.get("crowdT") : null;
+    const parsed = frozen === null ? NaN : Number(frozen);
+    const freezeAt = Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, ENTRANCE_DURATION) : undefined;
+    const beganLoading = performance.now();
+    const preparationLimit = 650;
+    let cancelled = false;
+    let complete = false;
+    let preparationTimer: number | undefined;
+    let controller: ReturnType<typeof createCrowdEntrance> | null = null;
+    const clearPreparationTimer = () => {
+      window.clearTimeout(preparationTimer);
+      preparationTimer = undefined;
+    };
+    const preparationExpired = () => freezeAt === undefined && performance.now() - beganLoading >= preparationLimit;
+    const settle = () => {
+      if (cancelled) return;
+      clearPreparationTimer();
+      complete = true;
+      setFinishTime(ENTRANCE_DURATION);
+      img.style.opacity = "1";
+      backCanvas.style.opacity = "0";
+      frontCanvas.style.opacity = "0";
+      wrapper.dataset.crowdPhase = "settled";
+      wrapper.style.visibility = "visible";
+    };
+    const stop = () => {
+      if (controller) controller.finish();
+      else settle();
+    };
+    const preferenceChanged = () => { if (preference.matches) stop(); };
+    const visibilityChanged = () => { if (document.hidden) stop(); };
+    preference.addEventListener("change", preferenceChanged);
+    document.addEventListener("visibilitychange", visibilityChanged);
+
+    const load = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Crowd image failed to load"));
+      image.src = src;
+    });
+    if (preference.matches || document.hidden) settle();
+    else {
+      if (freezeAt === undefined) preparationTimer = window.setTimeout(stop, preparationLimit);
+      Promise.all([load(crowdUrl), load(reconstructionUrl), load(gReconstructionUrl), load(maskUrl)])
+      .then(([source, background, gDonor, mask]) => {
+        if (cancelled || complete) return;
+        // Do not surprise someone with a delayed entrance after they have started reading.
+        if (preparationExpired()) { settle(); return; }
+        controller = createCrowdEntrance({
+          backCanvas, frontCanvas, source, background, gDonor, mask,
+          freezeAt,
+          onlyPerson: import.meta.env.DEV ? params.get("crowdStudy") ?? undefined : undefined,
+          onReady: () => {
+            if (cancelled || complete) return;
+            clearPreparationTimer();
+            backCanvas.style.opacity = "1";
+            frontCanvas.style.opacity = "1";
+            img.style.opacity = "0";
+            wrapper.dataset.crowdPhase = freezeAt === undefined ? "playing" : "paused";
+            wrapper.style.visibility = "visible";
+          },
+          onSettled: settle,
+          onFrame: setFinishTime,
+        });
+        // Layer extraction and GPU setup are synchronous, so include them in the deadline too.
+        if (preparationExpired()) { controller.finish(); return; }
+        controller.start();
+      })
+      .catch(() => {
+        controller?.destroy();
+        if (!cancelled) settle();
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      clearPreparationTimer();
+      preference.removeEventListener("change", preferenceChanged);
+      document.removeEventListener("visibilitychange", visibilityChanged);
+      controller?.destroy();
+    };
+  }, [setFinishTime]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -240,13 +343,22 @@ export function BinaryCharacter({
       ]
         .filter(Boolean)
         .join(" ")}
-      style={{ aspectRatio: `${SOURCE_WIDTH} / ${SOURCE_HEIGHT}`, maxWidth }}
+      style={{ aspectRatio: `${SOURCE_WIDTH} / ${SOURCE_HEIGHT}`, maxWidth, visibility: "hidden" }}
     >
+      {finishDefinition}
       <img
+        ref={crowdImgRef}
         src={crowdUrl}
         alt=""
         className="absolute inset-0 block h-full w-full pointer-events-none select-none"
+        style={{ opacity: 1, ...finishStyle }}
         draggable={false}
+      />
+      <canvas
+        ref={crowdBackRef}
+        aria-hidden
+        style={{ opacity: 0, ...finishStyle }}
+        className="absolute inset-0 block h-full w-full pointer-events-none"
       />
       {/* Always-black backing behind the silhouette, independent of the page theme, so the
        *  binary field and its halo sit on a consistent dark backdrop. */}
@@ -260,6 +372,14 @@ export function BinaryCharacter({
         style={glowStyle}
       />
       <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
+      {/* The moving people draw above the binary man so they cover his backing, digits and halo
+       *  while they walk past; hover still reaches the digit canvas beneath. */}
+      <canvas
+        ref={crowdFrontRef}
+        aria-hidden
+        style={{ opacity: 0, ...finishStyle }}
+        className="absolute inset-0 block h-full w-full pointer-events-none"
+      />
       <canvas
         ref={debugCanvasRef}
         hidden={!debugMask}
