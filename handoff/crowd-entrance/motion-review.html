@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Crowd entrance — motion review</title>
+  <style>
+    body { margin:0; background:#f4f3f0; color:#202321; font:15px/1.5 system-ui,sans-serif; }
+    main { max-width:1100px; margin:auto; padding:32px 24px; }
+    h1 { margin:6px 0 12px; font-size:32px; letter-spacing:-1px; font-weight:600; }
+    p { margin:8px 0; } a { color:inherit; text-decoration:underline; }
+    .eyebrow { font:12px ui-monospace,monospace; letter-spacing:.06em; text-transform:uppercase; }
+    .controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:20px 0; }
+    .controls label { display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
+    button, select { font:inherit; padding:8px 13px; border:1px solid #c8cbc5; background:white; border-radius:8px; cursor:pointer; }
+    button[aria-pressed=true] { color:white; background:#26382e; border-color:#26382e; }
+    #stage { padding:24px; background:white; border:1px solid #d9dcd7; border-radius:12px; }
+    #character { max-width:800px; margin:auto; }
+    #status { min-height:23px; color:#58635c; }
+    .note { max-width:760px; color:#58635c; margin-top:16px; }
+    @media(max-width:600px) { main{padding:20px 12px} #stage{padding:8px} h1{font-size:26px} }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Crowd entrance / Working component</p>
+    <h1>Accelerated life. A soft landing into the photograph.</h1>
+    <p>Seven people move around a fixed binary silhouette. G is the upper-left head behind D.</p>
+    <div class="controls" aria-label="Playback">
+      <button id="replay" type="button">Replay entrance</button>
+      <button type="button" data-progress="0" data-label="Start">Start</button>
+      <button type="button" data-progress="0.2" data-label="pace">0.6s · pace</button>
+      <button type="button" data-progress="0.4666666666666667" data-label="slowdown">1.4s · slowdown</button>
+      <button type="button" data-progress="0.8" data-label="landing">2.4s · landing</button>
+      <button type="button" data-progress="1" data-label="layered end">3s · layered end</button>
+      <label>Move <select id="person"><option value="">Everyone</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></label>
+      <label for="finish-blur">Finish blur <select id="finish-blur"><option value="0">Off · phase one</option><option value="0.6">Subtle</option><option value="1" selected>Motion · default</option><option value="1.5">Stronger</option></select></label>
+    </div>
+    <p id="status" role="status">Preparing the entrance…</p>
+    <p id="comparison"></p>
+    <div id="stage"><div id="character"></div></div>
+    <p class="note">The original visible photo pixels are retained. Hidden areas are reconstructed only where movement uncovers them. Motion is a short, articulated passage from a still image; it does not invent full walking cycles.</p>
+    <p class="note">Horizontal motion blur builds during the final third and stays on the settled crowd. Your binary silhouette stays sharp. Change Finish blur at rest to compare without replaying; Off restores the phase-one finish.</p>
+    <p class="note">The layered-end button pauses before the final handoff. Normal playback returns to the original image with the selected finish at <span id="duration">3 seconds</span>. Reduced-motion preferences show the finished photograph immediately.</p>
+    <p class="note"><a href="./generated-proof-v1/review.html">Inspect the A–G source map</a> · <a href="/">Open the hero</a></p>
+  </main>
+  <script type="module" src="./motion-review.tsx"></script>
+</body>
+</html>

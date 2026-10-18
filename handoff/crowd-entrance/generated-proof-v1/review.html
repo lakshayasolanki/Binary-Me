@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Crowd review — A–G + ME</title>
+  <link rel="stylesheet" href="review.css">
+  <script src="review.js" defer></script>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Crowd assets / Step 1</p>
+    <h1>Seven people. One still subject.</h1>
+    <p class="intro">G is the upper-left head behind D, following your drawing. This page separates their <strong>visible source regions</strong>. The working entrance, including G’s concealed-area reconstruction, is available in the motion review.</p>
+    <p class="status">Original source map · <a href="../motion-review.html">Open the working motion review →</a></p>
+  </header>
+  <div class="toolbar" aria-label="Review controls">
+    <fieldset><legend>Background</legend><div class="buttons">
+      <button type="button" data-background="white" aria-pressed="true">White</button>
+      <button type="button" data-background="black" aria-pressed="false">Black</button>
+      <button type="button" data-background="magenta" aria-pressed="false">Magenta</button>
+    </div></fieldset>
+    <label class="check"><input id="show-labels" type="checkbox" checked> Show person labels</label>
+  </div>
+  <section class="reference-section" aria-labelledby="map-title">
+    <div class="section-title"><h2 id="map-title">Corrected person map</h2><span>Original image · 1671 × 941</span></div>
+    <div class="stage" id="person-map"></div>
+    <p class="caption"><span class="g-key">G: behind, upper left.</span> <span class="d-key">D: in front, lower right.</span> A–F retain the original labels. ME remains the central silhouette.</p>
+  </section>
+  <section class="inspection" aria-labelledby="separation-title">
+    <div class="section-title"><h2 id="separation-title">Check D and G separately</h2><span>Same source pixels · Same positions</span></div>
+    <div class="buttons isolate-controls" aria-label="Visible source regions">
+      <button type="button" data-isolate="all" aria-pressed="true">Together</button>
+      <button type="button" data-isolate="D" aria-pressed="false">D only</button>
+      <button type="button" data-isolate="G" aria-pressed="false">G only</button>
+      <button type="button" data-isolate="rest" aria-pressed="false">Other people</button>
+    </div>
+    <div class="stage" id="isolation-stage"></div>
+    <p id="isolation-caption" class="caption" aria-live="polite">All original people shown together. Nothing has been generated or moved.</p>
+  </section>
+  <div class="grid closeups">
+    <section><h2>G — visible head and neck</h2><div class="stage closeup" id="g-closeup"></div><p class="caption">The crescent you marked behind D. The transparent cut edge is where D obscures G; it is not G’s complete anatomy.</p></section>
+    <section><h2>D — foreground head</h2><div class="stage closeup" id="d-closeup"></div><p class="caption">G’s upper-left crescent is excluded. This is a visible-region separation, not a completed walking asset.</p></section>
+  </div>
+  <aside class="note"><h2>What this establishes</h2><p>D and G are separate people with separate inspection views. The dividing line follows your annotation. These views show original visible regions only; use the motion review to inspect the reconstructed overlap and movement.</p></aside>
+  <details class="archive">
+    <summary>Earlier generated candidates — not approved</summary>
+    <p><strong>The old D_full.png merges D and G.</strong> It is superseded for person identification. Opus’s later person-map-v2.png reverses your D/G labels and is not used here.</p>
+    <div class="grid">
+      <section><h2>B — earlier candidate</h2><div class="stage"><img class="legacy-b" src="B_full.png" alt="Earlier generated person B candidate"></div><p class="caption">1670 × 941. Texture and contour differ from source; not a final replacement.</p></section>
+      <section><h2>D + G — incorrectly merged candidate</h2><div class="stage"><img src="D_full.png" alt="Superseded generated asset incorrectly combining D and G"></div><p class="caption">Do not treat this as one person.</p></section>
+      <section><h2>A, F, C, E — earlier back plate</h2><div class="stage"><img src="back_plate.png" alt="Earlier reconstructed background plate without G"></div><p class="caption">G is missing from this plate. It is not a complete background for a D-only mover.</p></section>
+    </div>
+  </details>
+</main>
+</body>
+</html>
