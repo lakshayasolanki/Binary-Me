@@ -11,12 +11,14 @@ import {
   computeMaskBounds,
   createBinaryField,
   DEFAULT_BINARY_COLOR,
+  DEFAULT_INTERACTIONS,
   renderHalo,
   renderMaskFill,
   SOURCE_HEIGHT,
   SOURCE_WIDTH,
   type BinaryFieldController,
   type BinaryFieldOptions,
+  type BinaryInteractions,
   type Bounds,
 } from "./binaryRenderer";
 import { createCrowdEntrance, ENTRANCE_DURATION } from "./crowdEntrance";
@@ -38,6 +40,8 @@ export interface BinaryCharacterProps extends BinaryFieldOptions {
    *  the mask's silhouette can be checked by eye against the crowd photo underneath. Off by
    *  default; the canvas is always laid out, just hidden, so toggling is instant. */
   debugMask?: boolean;
+  /** Which hover interactions are active; all on by default. Switched live, never a restart. */
+  interactions?: BinaryInteractions;
 }
 
 /**
@@ -69,6 +73,7 @@ export function BinaryCharacter({
   direction,
   theme = "dark",
   debugMask = false,
+  interactions = DEFAULT_INTERACTIONS,
 }: BinaryCharacterProps) {
   // `screen` makes the halo read as additive light over a dark backdrop; on a white backdrop
   // that would erase it entirely, so light mode switches to `multiply`, which tints/darkens
@@ -87,6 +92,7 @@ export function BinaryCharacter({
   // Same idea for glow strength: adjusted live, never a restart.
   const glowIntensityRef = useRef(glowIntensity);
   const controllerRef = useRef<BinaryFieldController | null>(null);
+  const interactionsRef = useRef(interactions);
   const crowdImgRef = useRef<HTMLImageElement>(null);
   const crowdBackRef = useRef<HTMLCanvasElement>(null);
   const crowdFrontRef = useRef<HTMLCanvasElement>(null);
@@ -237,6 +243,7 @@ export function BinaryCharacter({
       renderHalo(glowCtx, maskImage, cssWidth, cssHeight, bounds, colorRef.current, theme);
     }
 
+    controller.setInteractions(interactionsRef.current);
     controllerRef.current = controller;
     recolorRef.current = (hex) => {
       controller.setColor(hex);
@@ -301,6 +308,18 @@ export function BinaryCharacter({
     }
     wrapper.addEventListener("pointermove", handlePointerMove);
     wrapper.addEventListener("pointerleave", handlePointerLeave);
+    // Position first: a touch press has no preceding pointermove to say where it landed.
+    function handlePointerDown(event: PointerEvent) {
+      handlePointerMove(event);
+      controller.setPressed(true);
+    }
+    function handlePointerUp() {
+      controller.setPressed(false);
+    }
+    wrapper.addEventListener("pointerdown", handlePointerDown);
+    // Window-level so letting go outside the figure (or the page) still fires the burst.
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
 
     controller.start();
 
@@ -312,6 +331,9 @@ export function BinaryCharacter({
       resizeObserver.disconnect();
       wrapper.removeEventListener("pointermove", handlePointerMove);
       wrapper.removeEventListener("pointerleave", handlePointerLeave);
+      wrapper.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
       controller.destroy();
     };
   }, [
@@ -333,6 +355,11 @@ export function BinaryCharacter({
     colorRef.current = hex;
     recolorRef.current?.(hex);
   }, [binaryColor]);
+
+  useEffect(() => {
+    interactionsRef.current = interactions;
+    controllerRef.current?.setInteractions(interactions);
+  }, [interactions]);
 
   useEffect(() => {
     glowIntensityRef.current = glowIntensity;

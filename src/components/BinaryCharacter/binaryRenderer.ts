@@ -565,6 +565,18 @@ function buildLayout(bounds: Bounds, scale: number, options: ResolvedOptions): L
   return { columns, fontSizePx, lineHeightPx, tileHeight };
 }
 
+/** Every pointer interaction of the binary man, individually switchable (see DebugBar). */
+export interface BinaryInteractions {
+  /** Spotlight lift, edge rim and halo brightening while hovering the silhouette. */
+  glow: boolean;
+  /** Glyphs under the cursor re-randomize 0↔1. */
+  flip: boolean;
+  /** Press-and-hold builds glow intensity; releasing bursts it outward from the cursor. */
+  charge: boolean;
+}
+
+export const DEFAULT_INTERACTIONS: BinaryInteractions = { glow: true, flip: true, charge: true };
+
 export interface BinaryFieldController {
   start(): void;
   stop(): void;
@@ -581,6 +593,11 @@ export interface BinaryFieldController {
   /** Cursor position in CSS px relative to the field, or null once it leaves. Drives the
    *  hover spotlight, which only lights up while the point is over the silhouette itself. */
   setPointer(x: number | null, y?: number): void;
+  /** Press state for the charge interaction; a press only counts while over the silhouette,
+   *  and releasing after a hold fires the burst. */
+  setPressed(pressed: boolean): void;
+  /** Enables/disables individual hover interactions live (all on by default). */
+  setInteractions(next: Partial<BinaryInteractions>): void;
   destroy(): void;
 }
 
@@ -604,6 +621,25 @@ const SPOTLIGHT_FADE_TAU = 0.12;
 const SPOTLIGHT_FOLLOW_TAU = 0.06;
 /** Mask alpha (0-255) above which a pixel counts as "on the silhouette" for hover. */
 const HOVER_ALPHA_THRESHOLD = 128;
+/** Glyphs within this many font sizes of the cursor re-randomize while it is over the silhouette. */
+const HOVER_FLIP_RADIUS_EM = 7;
+/** Chance per second that a glyph under the cursor flips 0↔1 (idle flips are far rarer). */
+const HOVER_FLIP_RATE_PER_SEC = 14;
+/** Seconds of holding to reach full charge. */
+const CHARGE_SECONDS = 1.4;
+/** Extra brightness-ramp lift at full charge (on top of hover), strongest near the cursor. */
+const CHARGE_BRIGHTNESS_BOOST = 0.45;
+/** Halo brightening at full charge / peak burst, in units of the hover glow amount. */
+const CHARGE_HALO_GAIN = 1.6;
+const BURST_HALO_GAIN = 2.4;
+/** The release burst: a ring expanding from the cursor at this many silhouette-heights per
+ *  second, lifting the glyphs it passes and fading out over BURST_SECONDS. */
+const BURST_SECONDS = 0.8;
+const BURST_RING_SPEED_RATIO = 1.5;
+const BURST_RING_WIDTH_RATIO = 0.22;
+const BURST_BRIGHTNESS_BOOST = 0.6;
+/** Chance per second that a glyph inside the ring re-randomizes. */
+const BURST_FLIP_RATE_PER_SEC = 18;
 /** Edge-rim tint strength at full hover (EDGE_RIM_TINT_ALPHA at rest), so the inner outline
  *  brightens along with the glyphs. */
 const EDGE_RIM_HOVER_ALPHA = 0.65;
@@ -642,6 +678,12 @@ export function createBinaryField(
   let pointer: { x: number; y: number } | null = null;
   let spot = { x: 0, y: 0 };
   let hover = 0;
+  let pressed = false;
+  let charge = 0;
+  let burst: { x: number; y: number; peak: number; age: number } | null = null;
+  let lastGlowAmount = 0;
+  const interactions: BinaryInteractions = { ...DEFAULT_INTERACTIONS };
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
   function setBounds(newBounds: Bounds, scale: number) {
     bounds = newBounds;
@@ -700,7 +742,35 @@ export function createBinaryField(
   function setGlowIntensity(intensity: number) {
     if (intensity === resolved.glowIntensity) return;
     resolved.glowIntensity = intensity;
-    if (hover > 0) onHoverChange?.(hover * intensity);
+    notifyGlow(true);
+  }
+
+  /** Burst envelope, 1 at release easing to 0 over BURST_SECONDS. */
+  function burstLevel(): number {
+    if (!burst) return 0;
+    const t = Math.max(0, 1 - burst.age / BURST_SECONDS);
+    return burst.peak * t * t;
+  }
+
+  /** Reports the combined hover + charge + burst glow to the halo layer when it changes. */
+  function notifyGlow(force = false) {
+    const amount = (hover + charge * CHARGE_HALO_GAIN + burstLevel() * BURST_HALO_GAIN) * resolved.glowIntensity;
+    if (!force && amount === lastGlowAmount) return;
+    lastGlowAmount = amount;
+    onHoverChange?.(amount);
+  }
+
+  function setPressed(next: boolean) {
+    if (next) {
+      if (!interactions.charge || reducedMotion.matches) return;
+      if (!pointer || !isOverSilhouette(pointer.x, pointer.y)) return;
+      pressed = true;
+      return;
+    }
+    if (!pressed) return;
+    pressed = false;
+    if (charge > 0.05 && pointer) burst = { x: pointer.x, y: pointer.y, peak: charge, age: 0 };
+    charge = 0;
   }
 
   function setColor(hex: string) {
@@ -709,6 +779,10 @@ export function createBinaryField(
     palette = buildPalette(hex, resolved.theme);
     // The edge rim is baked with the glow color, so it has to be re-tinted too.
     if (lastMask) setMask(lastMask.image, lastMask.cssWidth, lastMask.cssHeight);
+  }
+
+  function setInteractions(next: Partial<BinaryInteractions>) {
+    Object.assign(interactions, next);
   }
 
   function setPointer(x: number | null, y = 0) {
@@ -724,7 +798,7 @@ export function createBinaryField(
   }
 
   function updateSpotlight(dt: number) {
-    const active = pointer != null && isOverSilhouette(pointer.x, pointer.y);
+    const active = interactions.glow && pointer != null && isOverSilhouette(pointer.x, pointer.y);
     if (pointer) {
       if (hover < 0.01) {
         // Fading in from nothing: start at the cursor instead of sliding over from the last spot.
@@ -736,23 +810,47 @@ export function createBinaryField(
       }
     }
     const fade = 1 - Math.exp(-dt / SPOTLIGHT_FADE_TAU);
-    const previous = hover;
     hover += ((active ? 1 : 0) - hover) * fade;
     if (hover < 0.001) hover = 0;
     if (hover > 0.999) hover = 1;
-    if (hover !== previous) onHoverChange?.(hover * resolved.glowIntensity);
   }
 
   function update(dt: number) {
     updateSpotlight(dt);
-    const { columns, tileHeight } = layout;
+    if (pressed && !interactions.charge) pressed = false;
+    if (pressed) charge = Math.min(1, charge + dt / CHARGE_SECONDS);
+    else if (charge > 0) charge = Math.max(0, charge - dt / 0.25);
+    if (burst) {
+      burst.age += dt;
+      if (burst.age >= BURST_SECONDS) burst = null;
+    }
+    notifyGlow();
+    const { columns, tileHeight, fontSizePx, lineHeightPx } = layout;
+    const ringRadius = burst ? burst.age * bounds.height * BURST_RING_SPEED_RATIO : 0;
+    const ringWidth = bounds.height * BURST_RING_WIDTH_RATIO;
+    const flipRadius = fontSizePx * HOVER_FLIP_RADIUS_EM;
+    const flipping =
+      interactions.flip && pointer != null && !reducedMotion.matches && isOverSilhouette(pointer.x, pointer.y);
     for (const column of columns) {
       column.offset = mod(column.offset + column.speed * dt, tileHeight);
-      for (const glyph of column.glyphs) {
+      const glyphs = column.glyphs;
+      for (let i = 0; i < glyphs.length; i++) {
+        const glyph = glyphs[i];
         updateGlyphBrightness(glyph, dt, classConfig);
         const flipChance = GLYPH_FLIP_CHANCE_PER_SEC * dt * (0.6 + glyph.brightness * 1.2);
         if (Math.random() < flipChance) {
           glyph.char = glyph.char === "0" ? "1" : "0";
+        }
+        if ((flipping || burst) && glyph.active) {
+          const pos = mod(i * lineHeightPx - column.offset, tileHeight);
+          const y = bounds.y - lineHeightPx + pos + lineHeightPx / 2 + glyph.dy;
+          const x = column.x + glyph.dx;
+          if (flipping && Math.hypot(x - pointer!.x, y - pointer!.y) < flipRadius && Math.random() < HOVER_FLIP_RATE_PER_SEC * dt) {
+            glyph.char = glyph.char === "0" ? "1" : "0";
+          }
+          if (burst && Math.abs(Math.hypot(x - burst.x, y - burst.y) - ringRadius) < ringWidth && Math.random() < BURST_FLIP_RATE_PER_SEC * dt) {
+            glyph.char = Math.random() < 0.5 ? "0" : "1";
+          }
         }
       }
     }
@@ -777,6 +875,9 @@ export function createBinaryField(
     const maxBloom = fontSizePx * 0.16;
     const dipRadius = bounds.height * HOVER_DIP_RADIUS_RATIO;
     const glow = hover * resolved.glowIntensity;
+    const burstAmount = burstLevel();
+    const burstRing = burst ? burst.age * bounds.height * BURST_RING_SPEED_RATIO : 0;
+    const burstWidth = bounds.height * BURST_RING_WIDTH_RATIO;
     const hoverOn = glow > 0 && dipRadius > 0;
 
     for (const column of columns) {
@@ -796,14 +897,26 @@ export function createBinaryField(
           brightness = Math.min(1, brightness + HOVER_BRIGHTNESS_BOOST * glow * (1 - dip));
         }
 
+        let bloomBrightness = glyph.brightness;
+        if (charge > 0) {
+          const near = 1 - Math.min(1, Math.hypot(x - spot.x, y - spot.y) / (bounds.height * 0.6));
+          brightness = Math.min(1, brightness + CHARGE_BRIGHTNESS_BOOST * charge * (0.4 + 0.6 * near));
+          bloomBrightness = Math.max(bloomBrightness, brightness);
+        }
+        if (burst) {
+          const band = Math.max(0, 1 - Math.abs(Math.hypot(x - burst.x, y - burst.y) - burstRing) / burstWidth);
+          brightness = Math.min(1, brightness + BURST_BRIGHTNESS_BOOST * burstAmount * (0.35 + 0.65 * band));
+          bloomBrightness = Math.max(bloomBrightness, brightness);
+        }
+
         const stepIndex = clamp(Math.round(brightness * lastStep), 0, lastStep);
         ctx.fillStyle = palette.steps[stepIndex];
         const baseAlpha = clamp(0.24 + brightness * 0.78, 0.18, 1);
         ctx.globalAlpha = clamp(baseAlpha * glyph.alphaNoise, 0.05, 1) * resolved.opacity;
 
-        if (glyph.brightness > BLOOM_THRESHOLD) {
+        if (bloomBrightness > BLOOM_THRESHOLD) {
           ctx.shadowColor = palette.glow;
-          ctx.shadowBlur = maxBloom * ((glyph.brightness - BLOOM_THRESHOLD) / (1 - BLOOM_THRESHOLD));
+          ctx.shadowBlur = maxBloom * ((bloomBrightness - BLOOM_THRESHOLD) / (1 - BLOOM_THRESHOLD));
         } else {
           ctx.shadowBlur = 0;
         }
@@ -867,5 +980,5 @@ export function createBinaryField(
     stop();
   }
 
-  return { start, stop, setBounds, setMask, setColor, setGlowIntensity, setPointer, destroy };
+  return { start, stop, setBounds, setMask, setColor, setGlowIntensity, setPointer, setPressed, setInteractions, destroy };
 }
