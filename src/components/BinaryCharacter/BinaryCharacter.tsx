@@ -1,8 +1,12 @@
 import { useEffect, useRef } from "react";
-import crowdUrl from "../../assets/binary-character/crowd.png";
-import reconstructionUrl from "../../assets/binary-character/reconstruction/background.png";
-import gReconstructionUrl from "../../assets/binary-character/reconstruction/G.png";
-import maskUrl from "../../assets/binary-character/person-mask.png";
+import crowdUrl from "../../assets/binary-character/crowd.webp";
+import reconstructionUrl from "../../assets/binary-character/reconstruction/background.webp";
+import gReconstructionUrl from "../../assets/binary-character/reconstruction/G.webp";
+import bImageUrl from "../../assets/binary-character/reconstruction/B.webp";
+import gImageUrl from "../../assets/binary-character/reconstruction/G-uploaded.png";
+import dImageUrl from "../../assets/binary-character/reconstruction/D-uploaded.png";
+import cImageUrl from "../../assets/binary-character/reconstruction/C-uploaded.png";
+import maskUrl from "../../assets/binary-character/person-mask.webp";
 import {
   computeMaskBounds,
   createBinaryField,
@@ -140,13 +144,14 @@ export function BinaryCharacter({
     if (preference.matches || document.hidden) settle();
     else {
       if (freezeAt === undefined) preparationTimer = window.setTimeout(stop, preparationLimit);
-      Promise.all([load(crowdUrl), load(reconstructionUrl), load(gReconstructionUrl), load(maskUrl)])
-      .then(([source, background, gDonor, mask]) => {
+      Promise.all([load(crowdUrl), load(reconstructionUrl), load(gReconstructionUrl), load(maskUrl), load(bImageUrl), load(gImageUrl), load(dImageUrl), load(cImageUrl)])
+      .then(([source, background, gDonor, mask, bImage, gImage, dImage, cImage]) => {
         if (cancelled || complete) return;
         // Do not surprise someone with a delayed entrance after they have started reading.
         if (preparationExpired()) { settle(); return; }
         controller = createCrowdEntrance({
-          backCanvas, frontCanvas, source, background, gDonor, mask,
+          backCanvas, frontCanvas, source, background, gDonor, mask, bImage, gImage, dImage, cImage,
+          onPreparedSource: url => { img.src = url; },
           freezeAt,
           onlyPerson: import.meta.env.DEV ? params.get("crowdStudy") ?? undefined : undefined,
           onReady: () => {

@@ -21,7 +21,7 @@ export const CROWD_PEOPLE: readonly CrowdPerson[] = [
   { id: "E", plane: "back", startX: -48, startY: 2, depth: 0.008, neck: [1510, 475], shoulderY: 560, stride: 1.2, phase: 2.4, weight: 0.75 },
   { id: "G", plane: "back", startX: -130, startY: 4, depth: 0.012, neck: [1210, 425], shoulderY: 520, stride: 0.95, phase: 4.8, weight: 0.5 },
   { id: "B", plane: "front", startX: 200, startY: 0, depth: 0.006, neck: [270, 465], shoulderY: 590, stride: 1.4, phase: 0.6, weight: 1 },
-  { id: "D", plane: "front", startX: -180, startY: 3, depth: 0.014, neck: [1350, 490], shoulderY: 590, stride: 1.15, phase: 3.1, weight: 0.85 },
+  { id: "D", plane: "front", startX: -100, startY: 3, depth: 0.014, neck: [1270, 490], shoulderY: 590, stride: 1.15, phase: 3.1, weight: 0.85 },
 ];
 
 export const ENTRANCE_DURATION = 3;

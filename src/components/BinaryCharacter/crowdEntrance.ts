@@ -11,6 +11,11 @@ interface Options {
   background: HTMLImageElement;
   gDonor: HTMLImageElement;
   mask: HTMLImageElement;
+  bImage: HTMLImageElement;
+  gImage: HTMLImageElement;
+  dImage: HTMLImageElement;
+  cImage: HTMLImageElement;
+  onPreparedSource: (url: string) => void;
   onReady: () => void;
   onSettled: () => void;
   onFrame?: (time: number) => void;
@@ -136,7 +141,15 @@ function createPlane(canvas: HTMLCanvasElement, layers: CrowdLayer[]) {
 }
 
 export function createCrowdEntrance(options: Options) {
-  const layers = createCrowdLayers(options.source, options.background, options.gDonor, options.mask);
+  const layers = createCrowdLayers(options.source, options.background, options.gDonor, options.mask, options.bImage, options.gImage, options.dImage, options.cImage);
+  // Preserve the uploaded B after playback settles.
+  const still = document.createElement("canvas");
+  still.width = SOURCE_WIDTH; still.height = SOURCE_HEIGHT;
+  const stillContext = still.getContext("2d")!;
+  for (const { canvas, bounds } of layers) {
+    stillContext.drawImage(canvas, bounds.x, bounds.y, bounds.width, bounds.height);
+  }
+  options.onPreparedSource(still.toDataURL("image/png"));
   // Development-only single-person study leaves the other six at their final pose.
   const movingLayers = layers.map(layer => options.onlyPerson && options.onlyPerson !== layer.person.id ? { ...layer, person: { ...layer.person, startX: 0, startY: 0, depth: 0, weight: 0 } } : layer);
   const back = createPlane(options.backCanvas, movingLayers.filter(layer => layer.person.plane === "back"));

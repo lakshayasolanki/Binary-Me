@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, type RefObject } from "react";
-import maskUrl from "../../assets/binary-character/person-mask.png";
+import maskUrl from "../../assets/binary-character/person-mask.webp";
 import { ENTRANCE_DURATION } from "./crowdMotion";
 
 const FINISH_START = ENTRANCE_DURATION * (2.05 / 3);
