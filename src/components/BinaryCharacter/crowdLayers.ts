@@ -1,5 +1,7 @@
 import { CROWD_PEOPLE, type CrowdId, type CrowdPerson } from "./crowdMotion";
 import { SOURCE_HEIGHT, SOURCE_WIDTH } from "./binaryRenderer";
+import { polishCrowdCanvas } from "./crowdPolish";
+import { applyCrowdPortrait, type CrowdPortraits } from "./crowdPortraits";
 
 export interface CrowdLayer {
   person: CrowdPerson;
@@ -28,13 +30,22 @@ function surface(width = SOURCE_WIDTH, height = SOURCE_HEIGHT) {
   return { canvas, ctx };
 }
 
-function pixels(image: HTMLImageElement, dx = 0, dy = 0) {
-  const { ctx } = surface();
-  ctx.drawImage(image, dx, dy);
-  return ctx.getImageData(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT).data;
+// iOS WebKit caps total canvas memory and silently blanks canvases past it, so scratch
+// surfaces are shrunk to zero as soon as they have been read.
+function release(canvas: HTMLCanvasElement) {
+  canvas.width = 0;
+  canvas.height = 0;
 }
 
-export function createCrowdLayers(source: HTMLImageElement, background: HTMLImageElement, gDonor: HTMLImageElement, mask: HTMLImageElement, bImage: HTMLImageElement, gImage: HTMLImageElement, dImage: HTMLImageElement, cImage: HTMLImageElement): CrowdLayer[] {
+function pixels(image: HTMLImageElement, dx = 0, dy = 0) {
+  const { canvas, ctx } = surface();
+  ctx.drawImage(image, dx, dy);
+  const data = ctx.getImageData(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT).data;
+  release(canvas);
+  return data;
+}
+
+export function createCrowdLayers(source: HTMLImageElement, background: HTMLImageElement, gDonor: HTMLImageElement, mask: HTMLImageElement, bImage: HTMLImageElement, gImage: HTMLImageElement, dImage: HTMLImageElement, cImage: HTMLImageElement, options: { polish?: boolean; portraits?: CrowdPortraits } = {}): CrowdLayer[] {
   const w = SOURCE_WIDTH;
   const h = SOURCE_HEIGHT;
   const sourcePixels = pixels(source);
@@ -47,8 +58,9 @@ export function createCrowdLayers(source: HTMLImageElement, background: HTMLImag
     if (dx * dx + dy * dy <= 36) expandedMask.ctx.drawImage(mask, dx, dy);
   }
   const fringePixels = expandedMask.ctx.getImageData(0, 0, w, h).data;
+  release(expandedMask.canvas);
   const maskPixels = pixels(mask);
-  const { ctx: ownership } = surface();
+  const { canvas: ownershipCanvas, ctx: ownership } = surface();
   const index = (id: CrowdId) => CROWD_PEOPLE.findIndex(person => person.id === id) + 1;
   const regions = new Uint8Array(w * h);
   const fill = (id: CrowdId, path?: string, rect?: number[], target = regions) => {
@@ -84,6 +96,8 @@ export function createCrowdLayers(source: HTMLImageElement, background: HTMLImag
   fill("F", undefined, [0, 0, w, h], donorRegions);
   fill("A", "M0 0 H100 V500 L135 500 Q80 540 50 600 Q15 650 0 700 Z", undefined, donorRegions);
   fill("C", "M450 0 H950 V941 H540 Q520 720 470 620 Q435 565 390 535 L430 510 L450 450 Z", undefined, donorRegions);
+
+  release(ownershipCanvas);
 
   return CROWD_PEOPLE.map(person => {
     if (["C"].includes(person.id)) {
@@ -176,6 +190,15 @@ export function createCrowdLayers(source: HTMLImageElement, background: HTMLImag
     const cropped = surface(bounds.width, bounds.height);
     cropped.ctx.drawImage(full.canvas, minX, minY, bounds.width, maxY - minY, 0, 0, bounds.width, maxY - minY);
     if (bottomPad) cropped.ctx.drawImage(full.canvas, minX, h - 1, bounds.width, 1, 0, h - minY, bounds.width, bottomPad);
+    release(full.canvas);
     return { person, canvas: cropped.canvas, bounds };
-  });
+  }).map(layer => options.polish === false ? layer : finishCrowdLayer(layer, options.portraits, mask));
+}
+
+export function finishCrowdLayer(layer: CrowdLayer, portraits: CrowdPortraits = {}, mask?: HTMLImageElement): CrowdLayer {
+  const portrait = portraits[layer.person.id];
+  if (portrait) return applyCrowdPortrait(layer, portrait, mask);
+  const canvas = polishCrowdCanvas(layer.canvas);
+  release(layer.canvas);
+  return { ...layer, canvas };
 }
