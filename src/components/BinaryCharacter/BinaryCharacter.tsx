@@ -1,11 +1,4 @@
 import { useEffect, useRef } from "react";
-import crowdUrl from "../../assets/binary-character/crowd.webp";
-import reconstructionUrl from "../../assets/binary-character/reconstruction/background.webp";
-import gReconstructionUrl from "../../assets/binary-character/reconstruction/G.webp";
-import bImageUrl from "../../assets/binary-character/reconstruction/B.webp";
-import gImageUrl from "../../assets/binary-character/reconstruction/G-uploaded.png";
-import dImageUrl from "../../assets/binary-character/reconstruction/D-uploaded.png";
-import cImageUrl from "../../assets/binary-character/reconstruction/C-uploaded.png";
 import maskUrl from "../../assets/binary-character/person-mask.webp";
 import {
   computeMaskBounds,
@@ -23,6 +16,8 @@ import {
 } from "./binaryRenderer";
 import { createCrowdEntrance, ENTRANCE_DURATION } from "./crowdEntrance";
 import { useCrowdFinish } from "./useCrowdFinish";
+import { crowdDebug } from "./crowdDebug";
+import { loadBakedLayers } from "./bakedLayers";
 
 const DEBUG_MASK_COLOR = "#ff00ff";
 /** How much the halo (the outer outline) brightens at full hover. On a light backdrop the
@@ -93,7 +88,7 @@ export function BinaryCharacter({
   const glowIntensityRef = useRef(glowIntensity);
   const controllerRef = useRef<BinaryFieldController | null>(null);
   const interactionsRef = useRef(interactions);
-  const crowdImgRef = useRef<HTMLImageElement>(null);
+  const crowdImgRef = useRef<HTMLCanvasElement>(null);
   const crowdBackRef = useRef<HTMLCanvasElement>(null);
   const crowdFrontRef = useRef<HTMLCanvasElement>(null);
   const { definition: finishDefinition, style: finishStyle, setTime: setFinishTime } = useCrowdFinish(crowdBlur, wrapperRef);
@@ -111,7 +106,9 @@ export function BinaryCharacter({
     const parsed = frozen === null ? NaN : Number(frozen);
     const freezeAt = Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, ENTRANCE_DURATION) : undefined;
     const beganLoading = performance.now();
-    const preparationLimit = 650;
+    crowdDebug(`effect start reduce=${preference.matches} hidden=${document.hidden} ua=${navigator.userAgent.slice(-40)}`);
+    // Phones load the artwork over slower links and set up WebGL on slower CPUs.
+    const preparationLimit = window.matchMedia("(pointer: coarse)").matches ? 2500 : 650;
     let cancelled = false;
     let complete = false;
     let preparationTimer: number | undefined;
@@ -122,6 +119,7 @@ export function BinaryCharacter({
     };
     const preparationExpired = () => freezeAt === undefined && performance.now() - beganLoading >= preparationLimit;
     const settle = () => {
+      crowdDebug(`settle cancelled=${cancelled}`);
       if (cancelled) return;
       clearPreparationTimer();
       complete = true;
@@ -141,26 +139,26 @@ export function BinaryCharacter({
     preference.addEventListener("change", preferenceChanged);
     document.addEventListener("visibilitychange", visibilityChanged);
 
-    const load = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("Crowd image failed to load"));
-      image.src = src;
-    });
     if (preference.matches || document.hidden) settle();
-    else {
-      if (freezeAt === undefined) preparationTimer = window.setTimeout(stop, preparationLimit);
-      Promise.all([load(crowdUrl), load(reconstructionUrl), load(gReconstructionUrl), load(maskUrl), load(bImageUrl), load(gImageUrl), load(dImageUrl), load(cImageUrl)])
-      .then(([source, background, gDonor, mask, bImage, gImage, dImage, cImage]) => {
-        if (cancelled || complete) return;
+    else if (freezeAt === undefined) preparationTimer = window.setTimeout(stop, preparationLimit);
+      loadBakedLayers()
+      .then(layers => {
+        crowdDebug(`images loaded cancelled=${cancelled} expired=${preparationExpired()} limit=${preparationLimit}`);
+        if (cancelled) return;
         // Do not surprise someone with a delayed entrance after they have started reading.
-        if (preparationExpired()) { settle(); return; }
+        // Still prepare the new artwork for reduced motion or a missed animation deadline.
+        const stillOnly = complete || preference.matches || document.hidden || preparationExpired();
         controller = createCrowdEntrance({
-          backCanvas, frontCanvas, source, background, gDonor, mask, bImage, gImage, dImage, cImage,
-          onPreparedSource: url => { img.src = url; },
+          backCanvas, frontCanvas, layers,
+          stillOnly,
+          onPreparedSource: still => {
+            img.width = still.width; img.height = still.height;
+            img.getContext("2d")?.drawImage(still, 0, 0);
+          },
           freezeAt,
           onlyPerson: import.meta.env.DEV ? params.get("crowdStudy") ?? undefined : undefined,
           onReady: () => {
+            crowdDebug(`ready cancelled=${cancelled} complete=${complete}`);
             if (cancelled || complete) return;
             clearPreparationTimer();
             backCanvas.style.opacity = "1";
@@ -172,15 +170,17 @@ export function BinaryCharacter({
           onSettled: settle,
           onFrame: setFinishTime,
         });
+        if (stillOnly) { settle(); return; }
         // Layer extraction and GPU setup are synchronous, so include them in the deadline too.
         if (preparationExpired()) { controller.finish(); return; }
         controller.start();
       })
-      .catch(() => {
+      .catch(error => {
+        console.warn("Crowd entrance fell back to the still image:", error);
+        crowdDebug(`ERROR ${error instanceof Error ? error.message : String(error)}`);
         controller?.destroy();
         if (!cancelled) settle();
       });
-    }
 
     return () => {
       cancelled = true;
@@ -378,13 +378,10 @@ export function BinaryCharacter({
       style={{ aspectRatio: `${SOURCE_WIDTH} / ${SOURCE_HEIGHT}`, maxWidth, visibility: "hidden" }}
     >
       {finishDefinition}
-      <img
+      <canvas
         ref={crowdImgRef}
-        src={crowdUrl}
-        alt=""
         className="absolute inset-0 block h-full w-full pointer-events-none select-none"
         style={{ opacity: 1, ...finishStyle }}
-        draggable={false}
       />
       <canvas
         ref={crowdBackRef}

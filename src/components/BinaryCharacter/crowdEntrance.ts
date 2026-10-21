@@ -1,26 +1,21 @@
 import { SOURCE_HEIGHT, SOURCE_WIDTH } from "./binaryRenderer";
-import { createCrowdLayers, type CrowdLayer } from "./crowdLayers";
+import type { CrowdLayer } from "./crowdLayers";
 import { ENTRANCE_DURATION, sampleCrowdMotion } from "./crowdMotion";
+import { crowdDebug } from "./crowdDebug";
 
 export { ENTRANCE_DURATION } from "./crowdMotion";
 
 interface Options {
   backCanvas: HTMLCanvasElement;
   frontCanvas: HTMLCanvasElement;
-  source: HTMLImageElement;
-  background: HTMLImageElement;
-  gDonor: HTMLImageElement;
-  mask: HTMLImageElement;
-  bImage: HTMLImageElement;
-  gImage: HTMLImageElement;
-  dImage: HTMLImageElement;
-  cImage: HTMLImageElement;
-  onPreparedSource: (url: string) => void;
+  layers: CrowdLayer[];
+  onPreparedSource: (still: HTMLCanvasElement) => void;
   onReady: () => void;
   onSettled: () => void;
   onFrame?: (time: number) => void;
   freezeAt?: number;
   onlyPerson?: string;
+  stillOnly?: boolean;
 }
 
 // A continuous skinned mesh, rather than independently shifted rows. Head and shoulders
@@ -47,7 +42,8 @@ const vertexSource = `
     vec2 neck = hip + rotatePoint(u_neck - hip, u_body);
     float headWeight = 1.0 - smoothstep(u_neck.y - 45.0, u_neck.y + 55.0, a_position.y);
     p = mix(p, neck + rotatePoint(p - neck, u_head), headWeight);
-    float shoulderWeight = exp(-pow((a_position.y - u_shoulder)/110.0, 2.0));
+    float shoulderDelta = (a_position.y - u_shoulder) / 110.0;
+    float shoulderWeight = exp(-shoulderDelta * shoulderDelta);
     p.y += u_lift * clamp((a_position.x-u_neck.x)/190.0, -1.0, 1.0) * shoulderWeight;
     p = u_neck + (p - u_neck) * u_scale + u_move;
     gl_Position = vec4(p.x / ${SOURCE_WIDTH}.0 * 2.0 - 1.0, 1.0 - p.y / ${SOURCE_HEIGHT}.0 * 2.0, 0.0, 1.0);
@@ -62,6 +58,7 @@ const fragmentSource = `
 `;
 
 function createPlane(canvas: HTMLCanvasElement, layers: CrowdLayer[]) {
+  let debugLogged = false;
   const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, preserveDrawingBuffer: true });
   if (!gl) throw new Error("Crowd rendering is unavailable");
   const shader = (type: number, source: string) => {
@@ -79,6 +76,7 @@ function createPlane(canvas: HTMLCanvasElement, layers: CrowdLayer[]) {
   gl.attachShader(program, vertex); gl.attachShader(program, fragment); gl.linkProgram(program);
   gl.deleteShader(vertex); gl.deleteShader(fragment);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error("Crowd shader link failed");
+  crowdDebug(`gl max=${gl.getParameter(gl.MAX_TEXTURE_SIZE)} layers=${layers.map(l => `${l.person.id}:${l.canvas.width}x${l.canvas.height}`).join(",")}`);
   gl.useProgram(program);
   const position = gl.getAttribLocation(program, "a_position");
   const uv = gl.getAttribLocation(program, "a_uv");
@@ -131,6 +129,13 @@ function createPlane(canvas: HTMLCanvasElement, layers: CrowdLayer[]) {
         gl.uniform1f(uniform.lift, pose.shoulderLift);
         gl.drawArrays(gl.TRIANGLES, 0, count);
       }
+      if (!debugLogged) {
+        debugLogged = true;
+        const px = new Uint8Array(4 * 64);
+        let seen = 0;
+        for (let row = 0; row < 8; row++) { gl.readPixels(Math.floor(w / 2), Math.floor(h * (row + 0.5) / 8), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px.subarray(row * 4, row * 4 + 4)); if (px[row * 4 + 3]) seen++; }
+        crowdDebug(`draw t=${t.toFixed(2)} canvas=${w}x${h} layers=${meshes.length} glError=${gl.getError()} opaqueSamples=${seen}/8`);
+      }
     },
     destroy() {
       for (const mesh of meshes) { gl.deleteBuffer(mesh.buffer); gl.deleteTexture(mesh.texture); }
@@ -141,15 +146,20 @@ function createPlane(canvas: HTMLCanvasElement, layers: CrowdLayer[]) {
 }
 
 export function createCrowdEntrance(options: Options) {
-  const layers = createCrowdLayers(options.source, options.background, options.gDonor, options.mask, options.bImage, options.gImage, options.dImage, options.cImage);
-  // Preserve the uploaded B after playback settles.
+  const { layers } = options;
+  // The settled image must use the same uploaded portraits as the moving layers.
   const still = document.createElement("canvas");
   still.width = SOURCE_WIDTH; still.height = SOURCE_HEIGHT;
   const stillContext = still.getContext("2d")!;
   for (const { canvas, bounds } of layers) {
     stillContext.drawImage(canvas, bounds.x, bounds.y, bounds.width, bounds.height);
   }
-  options.onPreparedSource(still.toDataURL("image/png"));
+  options.onPreparedSource(still);
+  if (options.stillOnly) return {
+    start: options.onSettled,
+    finish: options.onSettled,
+    destroy() {},
+  };
   // Development-only single-person study leaves the other six at their final pose.
   const movingLayers = layers.map(layer => options.onlyPerson && options.onlyPerson !== layer.person.id ? { ...layer, person: { ...layer.person, startX: 0, startY: 0, depth: 0, weight: 0 } } : layer);
   const back = createPlane(options.backCanvas, movingLayers.filter(layer => layer.person.plane === "back"));
