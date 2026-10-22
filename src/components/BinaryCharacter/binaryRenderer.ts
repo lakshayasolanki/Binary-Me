@@ -264,6 +264,61 @@ const EDGE_GLOW_BLUR_RATIO = 0.014;
  *  wider reach there — kept small so "more pronounced" stays about brightness, not size. */
 const HEAD_EXTRA_BLUR_RATIO = 0.01;
 
+/** Some browsers (older Safari/iOS) ignore `CanvasRenderingContext2D.filter`. Reading the property
+ *  back is no proof of support there, since assigning to an unknown property just stores it, so
+ *  blur a single pixel and check that it actually spread. Without a working blur the halo ring
+ *  cancels itself out entirely. */
+const SUPPORTS_CANVAS_FILTER = (() => {
+  try {
+    const probe = document.createElement("canvas");
+    probe.width = 9;
+    probe.height = 9;
+    const pctx = probe.getContext("2d", { willReadFrequently: true });
+    if (!pctx) return false;
+    pctx.filter = "blur(2px)";
+    pctx.fillRect(4, 4, 1, 1);
+    return pctx.getImageData(2, 4, 1, 1).data[3] > 0;
+  } catch {
+    return false;
+  }
+})();
+
+/** Draws `source` (w×h, painted in `color`) blurred by `blurPx`. Without canvas filters the same
+ *  blur comes from `shadowBlur`: the source is drawn off-canvas and only its shadow lands in view. */
+function drawBlurred(
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  blurPx: number,
+  color: string,
+  w: number,
+  h: number,
+): void {
+  if (SUPPORTS_CANVAS_FILTER) {
+    ctx.filter = `blur(${blurPx}px)`;
+    ctx.drawImage(source, 0, 0, w, h);
+    ctx.filter = "none";
+    return;
+  }
+  const scale = ctx.getTransform().a || 1;
+  const away = w + blurPx * 4 + 16;
+  ctx.save();
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 2 * blurPx * scale;
+  ctx.shadowOffsetX = away * scale;
+  ctx.drawImage(source, -away, 0, w, h);
+  ctx.restore();
+}
+
+/** Phones have no hover to light the outline, so on touch screens the resting outline (outer
+ *  halo and inner edge rim) is stronger, and reaches further because its edge line saturates. */
+const TOUCH_GLOW_BOOST = 2.5;
+const TOUCH_GLOW_REACH = 1.5;
+const COARSE_POINTER = typeof window !== "undefined" ? window.matchMedia("(pointer: coarse)") : null;
+/** Desktop gets a milder version of the same lift so the resting outline reads more strongly. */
+const DESKTOP_GLOW_BOOST = 1.8;
+const DESKTOP_GLOW_REACH = 1.4;
+const glowBoost = () => (COARSE_POINTER?.matches ? TOUCH_GLOW_BOOST : DESKTOP_GLOW_BOOST);
+
 /**
  * Paints a thin, bright luminous rim that follows the silhouette's exact *edge*, stronger
  * around the head/shoulders and subtler down the body. Two layers, both built by blurring the
@@ -312,17 +367,17 @@ export function renderHalo(
     canvasEl.height = h;
     const rctx = canvasEl.getContext("2d");
     if (!rctx) return canvasEl;
-    rctx.filter = `blur(${blurPx}px)`;
-    rctx.drawImage(tint, 0, 0);
-    rctx.filter = "none";
+    drawBlurred(rctx, tint, blurPx, glowColor, w, h);
     rctx.globalCompositeOperation = "destination-out";
     rctx.drawImage(maskImage, 0, 0, w, h);
     rctx.globalCompositeOperation = "source-over";
     return canvasEl;
   }
 
-  const coreBlur = clamp(bounds.width * CORE_RIM_BLUR_RATIO, 1, 3);
-  const edgeBlur = clamp(bounds.width * EDGE_GLOW_BLUR_RATIO, 2, 8);
+  const boost = glowBoost();
+  const reach = COARSE_POINTER?.matches ? TOUCH_GLOW_REACH : DESKTOP_GLOW_REACH;
+  const coreBlur = clamp(bounds.width * CORE_RIM_BLUR_RATIO, 1, 3) * reach;
+  const edgeBlur = clamp(bounds.width * EDGE_GLOW_BLUR_RATIO, 2, 8) * reach;
   const coreRing = buildRing(coreBlur);
   const softRing = buildRing(edgeBlur);
 
@@ -330,9 +385,9 @@ export function renderHalo(
 
   // Short soft feather immediately past the edge, then a thin bright core right at it — both
   // already soft from their own construction, so no extra blur on either here.
-  ctx.globalAlpha = 0.22;
+  ctx.globalAlpha = Math.min(1, 0.22 * boost);
   ctx.drawImage(softRing, 0, 0, w, h);
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = Math.min(1, 0.55 * boost);
   ctx.drawImage(coreRing, 0, 0, w, h);
 
   // Stronger, still-thin glow concentrated around the head and shoulders — brighter there,
@@ -354,9 +409,8 @@ export function renderHalo(
     hctx.fillRect(0, 0, w, h);
 
     const headExtraBlur = clamp(bounds.width * HEAD_EXTRA_BLUR_RATIO, 1, 5);
-    ctx.filter = `blur(${headExtraBlur}px)`;
-    ctx.globalAlpha = 0.5;
-    ctx.drawImage(headLayer, 0, 0, w, h);
+    ctx.globalAlpha = Math.min(1, 0.5 * boost);
+    drawBlurred(ctx, headLayer, headExtraBlur, glowColor, w, h);
   }
 
   ctx.restore();
@@ -731,8 +785,7 @@ export function createBinaryField(
     blurredMask.height = h;
     const bctx = blurredMask.getContext("2d");
     if (bctx) {
-      bctx.filter = `blur(${rimDepth}px)`;
-      bctx.drawImage(maskImage, 0, 0, w, h);
+      drawBlurred(bctx, maskImage, rimDepth, "#000", w, h);
       ectx.globalCompositeOperation = "destination-out";
       ectx.drawImage(blurredMask, 0, 0);
       ectx.globalCompositeOperation = "source-over";
@@ -945,7 +998,7 @@ export function createBinaryField(
     // glyphs outside the thin rim (see setMask), so density/color elsewhere is untouched.
     if (edgeRimCanvas) {
       ctx.globalCompositeOperation = "source-atop";
-      ctx.globalAlpha = Math.min(1, EDGE_RIM_TINT_ALPHA + (EDGE_RIM_HOVER_ALPHA - EDGE_RIM_TINT_ALPHA) * glow);
+      ctx.globalAlpha = Math.min(1, EDGE_RIM_TINT_ALPHA * glowBoost() + (EDGE_RIM_HOVER_ALPHA - EDGE_RIM_TINT_ALPHA) * glow);
       ctx.drawImage(edgeRimCanvas, 0, 0);
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;

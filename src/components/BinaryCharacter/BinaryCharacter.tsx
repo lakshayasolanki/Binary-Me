@@ -375,7 +375,16 @@ export function BinaryCharacter({
       ]
         .filter(Boolean)
         .join(" ")}
-      style={{ aspectRatio: `${SOURCE_WIDTH} / ${SOURCE_HEIGHT}`, maxWidth, visibility: "hidden" }}
+      style={{
+        aspectRatio: `${SOURCE_WIDTH} / ${SOURCE_HEIGHT}`,
+        maxWidth,
+        visibility: "hidden",
+        // Holding or dragging over the figure must never select it or open the iOS callout.
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+        WebkitTapHighlightColor: "transparent",
+      }}
     >
       {finishDefinition}
       <canvas
