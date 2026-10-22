@@ -12,7 +12,7 @@
   <header>
     <p class="eyebrow">Crowd assets / Step 1</p>
     <h1>Seven people. One still subject.</h1>
-    <p class="intro">These clippings come directly from the current animation. B, C, G and D use your supplied portraits. G remains separate behind D.</p>
+    <p class="intro">These clippings come directly from the current animation. B, C, E, F and D use your latest transparent uploads with their original proportions. G remains separate behind D.</p>
     <p class="status">Live runtime clippings · <a href="../motion-review.html">Open the working motion review →</a></p>
   </header>
   <div class="toolbar" aria-label="Review controls">
@@ -22,7 +22,10 @@
       <button type="button" data-background="magenta" aria-pressed="false">Magenta</button>
     </div></fieldset>
     <label class="check"><input id="show-labels" type="checkbox" checked> Show person labels</label>
+    <label class="check"><input id="show-polish" type="checkbox" checked> Updated artwork</label>
   </div>
+  <p id="polish-verification" class="caption" role="status">Checking the transparent uploads…</p>
+  <div id="layer-downloads" class="buttons" aria-label="Download individual crowd images"></div>
   <section class="reference-section" aria-labelledby="map-title">
     <div class="section-title"><h2 id="map-title">Corrected person map</h2><span>Current layers · 1671 × 941</span></div>
     <div class="stage" id="person-map"></div>
@@ -45,8 +48,8 @@
     <p id="isolation-caption" class="caption" aria-live="polite">Loading current clippings…</p>
   </section>
   <div class="grid closeups">
-    <section><h2>B — uploaded cutout</h2><div class="stage closeup" id="b-closeup"></div><p class="caption">Your complete transparent PNG, used directly in the animation.</p></section>
-    <section><h2>D — supplied portrait</h2><div class="stage closeup" id="d-closeup"></div><p class="caption">Your supplied D portrait, with its exterior background removed.</p></section>
+    <section><h2>B — supplied portrait</h2><div class="stage closeup" id="b-closeup"></div><p class="caption">Your latest transparent B artwork, with its native silhouette preserved.</p></section>
+    <section><h2>D — supplied portrait</h2><div class="stage closeup" id="d-closeup"></div><p class="caption">Your latest D artwork, retaining the binary man's overlap clipping.</p></section>
     <section><h2>G — separate rear figure</h2><div class="stage closeup" id="g-closeup"></div><p class="caption">Your uploaded transparent G portrait, behind D.</p></section>
   </div>
   <aside class="note"><h2>Current clippings</h2><p>This page shares the animation’s layer builder. Future clipping changes appear here too. Background controls help inspect transparency; individual views show the full layer, including portions concealed by other people.</p></aside>
