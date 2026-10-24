@@ -9,6 +9,8 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { ScrambleName } from "./components/ScrambleName";
 
+import { useEasedValue } from "./components/useEasedValue";
+
 const COLOR_STORAGE_KEY = "binary-color";
 const GLOW_STORAGE_KEY = "binary-glow";
 const HEX_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -50,6 +52,9 @@ function AppContent() {
   const [binaryColor, setBinaryColor] = useState(loadBinaryColor);
   const [glowIntensity, setGlowIntensity] = useState(loadGlowIntensity);
 
+  const [nameHovered, setNameHovered] = useState(false);
+  const nameBoost = useEasedValue(nameHovered ? 1 : 0);
+
   useEffect(() => saveStored(COLOR_STORAGE_KEY, binaryColor), [binaryColor]);
   useEffect(() => saveStored(GLOW_STORAGE_KEY, String(glowIntensity)), [glowIntensity]);
 
@@ -62,12 +67,17 @@ function AppContent() {
         <GlowSlider value={glowIntensity} onChange={setGlowIntensity} />
       </div>
       <div className="flex w-full flex-1 items-center justify-center lg:justify-end">
+        <div
+          onPointerEnter={(e) => e.pointerType !== "touch" && setNameHovered(true)}
+          onPointerLeave={() => setNameHovered(false)}
+        >
         <ScrambleName>
           <ColorDot value={binaryColor} onChange={setBinaryColor} />
         </ScrambleName>
+        </div>
       </div>
       <div className="flex w-full flex-1 items-center justify-center lg:justify-start">
-        <BinaryCharacter maxWidth={640} binaryColor={binaryColor} glowIntensity={glowIntensity} theme="dark" debugMask={debugMask} />
+        <BinaryCharacter maxWidth={640} binaryColor={binaryColor} glowIntensity={Math.min(2, glowIntensity * (1 + 0.8 * nameBoost))} crowdBlurBoost={3 * nameBoost} theme="dark" debugMask={debugMask} />
       </div>
     </div>
   );

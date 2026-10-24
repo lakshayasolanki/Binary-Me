@@ -30,6 +30,8 @@ export interface BinaryCharacterProps extends BinaryFieldOptions {
   maxWidth?: number | string;
   /** Horizontal photographic motion residue after landing. 0 restores the sharp finish. */
   crowdBlur?: number;
+  /** Extra crowd blur added at any time, including mid-entrance (e.g. while the name is hovered). */
+  crowdBlurBoost?: number;
   /** Dev-only: paints person-mask.png as a flat, opaque color using the exact same
    *  drawImage-based mask compositing as the backing and digit field (see renderMaskFill), so
    *  the mask's silhouette can be checked by eye against the crowd photo underneath. Off by
@@ -55,6 +57,7 @@ export function BinaryCharacter({
   className,
   maxWidth,
   crowdBlur = 1,
+  crowdBlurBoost = 0,
   streamCount,
   minSpeed,
   maxSpeed,
@@ -91,7 +94,7 @@ export function BinaryCharacter({
   const crowdImgRef = useRef<HTMLCanvasElement>(null);
   const crowdBackRef = useRef<HTMLCanvasElement>(null);
   const crowdFrontRef = useRef<HTMLCanvasElement>(null);
-  const { definition: finishDefinition, style: finishStyle, setTime: setFinishTime } = useCrowdFinish(crowdBlur, wrapperRef);
+  const { definition: finishDefinition, style: finishStyle, setTime: setFinishTime } = useCrowdFinish(crowdBlur, wrapperRef, crowdBlurBoost);
   // Reveal either the prepared first pose or the still reference, so the final composition
   // never flashes before the entrance. Normal preparation has a short, bounded deadline.
   useEffect(() => {

@@ -4,12 +4,14 @@ import { ENTRANCE_DURATION } from "./crowdMotion";
 
 const FINISH_START = ENTRANCE_DURATION * (2.05 / 3);
 
-/** Static photographic motion residue. Only its arrival is animated; its grain never loops. */
-export function useCrowdFinish(amount: number, scope: RefObject<HTMLDivElement | null>) {
+/** Static photographic motion residue. Only its arrival is animated; its grain never loops.
+ *  `boost` is extra strength added on top at any moment, even before the entrance has reached the finish. */
+export function useCrowdFinish(amount: number, scope: RefObject<HTMLDivElement | null>, boost = 0) {
   const id = `crowd-finish-${useId().replace(/:/g, "")}`;
   const blur = useRef<SVGFEGaussianBlurElement>(null);
   const displacement = useRef<SVGFEDisplacementMapElement>(null);
   const amountRef = useRef(amount);
+  const boostRef = useRef(0);
   const timeRef = useRef(0);
   const lastValue = useRef(-1);
 
@@ -17,7 +19,9 @@ export function useCrowdFinish(amount: number, scope: RefObject<HTMLDivElement |
     timeRef.current = time;
     // Arrives gently during the final landing, then remains in the still photograph.
     const t = Math.max(0, Math.min(1, (time - FINISH_START) / (ENTRANCE_DURATION - FINISH_START)));
-    const strength = Number((t * t * (3 - 2 * t) * amountRef.current).toFixed(4));
+    const base = t * t * (3 - 2 * t) * amountRef.current;
+    // Boost only applies while the blur is enabled, so switching it off still clears everything.
+    const strength = Number((base + (amountRef.current > 0 ? boostRef.current : 0)).toFixed(4));
     if (strength === lastValue.current) return;
     if ((strength > 0) !== (lastValue.current > 0) || lastValue.current < 0) {
       // Bypass the filter entirely during phase one and when the experiment is switched off.
@@ -30,8 +34,9 @@ export function useCrowdFinish(amount: number, scope: RefObject<HTMLDivElement |
 
   useEffect(() => {
     amountRef.current = Number.isFinite(amount) ? Math.max(0, Math.min(2, amount)) : 1;
+    boostRef.current = Number.isFinite(boost) ? Math.max(0, Math.min(4, boost)) : 0;
     setTime(timeRef.current);
-  }, [amount, setTime]);
+  }, [amount, boost, setTime]);
 
   return {
     setTime,
