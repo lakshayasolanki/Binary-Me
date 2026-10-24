@@ -24,6 +24,10 @@ const DEBUG_MASK_COLOR = "#ff00ff";
  *  halo multiplies, so it is darkened instead to read stronger. */
 const HALO_HOVER_GAIN = 0.6;
 
+/** Feathers all four edges of the component into the page; the two gradients are intersected. */
+const EDGE_FADE_MASK =
+  "linear-gradient(to right, transparent, #000 2%, #000 98%, transparent), linear-gradient(to bottom, transparent, #000 1.5%, #000 98.5%, transparent)";
+
 export interface BinaryCharacterProps extends BinaryFieldOptions {
   className?: string;
   /** Caps how wide the component can render; it still scales down freely below this. */
@@ -373,7 +377,7 @@ export function BinaryCharacter({
     <div
       ref={wrapperRef}
       className={[
-        "relative w-full overflow-hidden bg-white dark:bg-black",
+        "relative w-full overflow-hidden bg-(--surface)",
         className,
       ]
         .filter(Boolean)
@@ -387,6 +391,10 @@ export function BinaryCharacter({
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
         WebkitTapHighlightColor: "transparent",
+        maskImage: EDGE_FADE_MASK,
+        maskComposite: "intersect",
+        WebkitMaskImage: EDGE_FADE_MASK,
+        WebkitMaskComposite: "source-in",
       }}
     >
       {finishDefinition}

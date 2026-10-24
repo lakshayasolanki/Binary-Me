@@ -3,8 +3,9 @@ import { useEffect, useRef, type ReactNode } from "react";
 const SYMBOLS = Array.from("∑∫∬∂πλΦΨΩβμϑℏ∀∃∄∈∋∉⊗÷∴∵∞√≠≈≡≤≥↗↘↖↔→↓⇕⊥⊨¬∨∪∇ℕℝℤ𝔹𝒩𝒦𝒲𝒜℘[]{}()|~");
 const COLORS = ["violet", "blue", "teal", "green", "gold", "pink", "coral"];
 
-export function ScrambleName({ children }: { children: ReactNode }) {
-  const heading = useRef<HTMLHeadingElement>(null);
+/** `inline` renders the name as a single-line span that takes its size from the surrounding text. */
+export function ScrambleName({ children, inline = false }: { children?: ReactNode; inline?: boolean }) {
+  const heading = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const root = heading.current;
@@ -72,23 +73,36 @@ export function ScrambleName({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return (
-    <h1 ref={heading} className="scramble-name font-mono-name flex flex-col items-start text-left text-[clamp(2.75rem,10.5vw,4.5rem)] leading-[1.1] font-medium tracking-[0.03em] text-black transition-colors duration-300 sm:text-[clamp(4rem,9vw,6rem)] lg:text-[clamp(4.5rem,6.5vw,6.25rem)] dark:text-white">
-      <span className="sr-only">Lakshaya Solanki</span>
-      {["Lakshaya", "Solanki"].map((word, row) => (
-        <span key={word} className="scramble-line">
-          <span aria-hidden="true" className="scramble-word">
-            {Array.from(word).map((letter, index) => (
-              <span key={index} className="scramble-letter" data-letter={letter}
-                >
-                <span className="scramble-original">{letter}</span>
-                <span className="scramble-glyph" />
-              </span>
-            ))}
+  const words = ["Lakshaya", "Solanki"].map((word, row) => (
+    <span key={word} className="scramble-line">
+      <span aria-hidden="true" className="scramble-word">
+        {Array.from(word).map((letter, index) => (
+          <span key={index} className="scramble-letter" data-letter={letter}>
+            <span className="scramble-original">{letter}</span>
+            <span className="scramble-glyph" />
           </span>
-          {row === 1 && <span className="scramble-dot">{children}</span>}
-        </span>
-      ))}
+        ))}
+      </span>
+      {!inline && row === 1 && <span className="scramble-dot">{children}</span>}
+    </span>
+  ));
+
+  if (inline) {
+    return (
+      <span ref={heading} className="scramble-name font-mono-name inline-block whitespace-nowrap font-bold text-black transition-colors duration-300 dark:text-white">
+        <span className="sr-only">Lakshaya Solanki</span>
+        {words[0]}
+        <span aria-hidden="true">{" "}</span>
+        {words[1]}
+        {children}
+      </span>
+    );
+  }
+
+  return (
+    <h1 ref={heading as React.RefObject<HTMLHeadingElement>} className="scramble-name font-mono-name flex flex-col items-start text-left text-[clamp(2.75rem,10.5vw,4.5rem)] leading-[1.1] font-medium tracking-[0.03em] text-black transition-colors duration-300 sm:text-[clamp(4rem,9vw,6rem)] lg:text-[clamp(4.5rem,6.5vw,6.25rem)] dark:text-white">
+      <span className="sr-only">Lakshaya Solanki</span>
+      {words}
     </h1>
   );
 }

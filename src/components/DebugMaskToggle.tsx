@@ -13,7 +13,7 @@ export function DebugMaskToggle({ enabled, onToggle }: DebugMaskToggleProps) {
     <button
       type="button"
       onClick={onToggle}
-      className="fixed top-4 left-4 z-10 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-black shadow-sm backdrop-blur transition-colors hover:bg-white dark:border-white/15 dark:bg-black/60 dark:text-white dark:hover:bg-black"
+      className="rounded-full border border-black/10 bg-(--surface) px-4 py-2 text-sm font-medium text-black shadow-sm transition-colors hover:brightness-95 dark:border-white/15 dark:text-white dark:hover:brightness-125"
       aria-pressed={enabled}
       aria-label="Toggle person-mask.png debug overlay"
     >

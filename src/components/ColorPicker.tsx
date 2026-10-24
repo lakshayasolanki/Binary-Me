@@ -1,3 +1,5 @@
+import { haptic } from "./haptic";
+
 /** Seed colors for the binary field. Only hue and saturation really matter — buildPalette
  *  (see binaryRenderer.ts) derives the whole dim -> bright shade ramp from them. */
 const COLOR_PRESETS = [
@@ -22,19 +24,22 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
     <div
       role="group"
       aria-label="Binary color"
-      className="flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-2 shadow-sm backdrop-blur dark:border-white/15 dark:bg-black/60"
+      className="flex items-center gap-2 rounded-full border border-black/10 bg-(--surface) px-3 py-2 shadow-sm dark:border-white/15"
     >
       {COLOR_PRESETS.map((preset) => (
         <button
           key={preset.hex}
           type="button"
-          onClick={() => onChange(preset.hex)}
+          onClick={() => {
+            haptic();
+            onChange(preset.hex);
+          }}
           aria-label={preset.name}
           aria-pressed={value === preset.hex}
           title={preset.name}
           className={[
             "size-6 rounded-full transition-transform hover:scale-110",
-            value === preset.hex ? "ring-2 ring-black ring-offset-2 ring-offset-white dark:ring-white dark:ring-offset-black" : "",
+            value === preset.hex ? "ring-2 ring-black ring-offset-2 ring-offset-(--surface) dark:ring-white" : "",
           ].join(" ")}
           style={{ backgroundColor: preset.hex }}
         />
@@ -43,7 +48,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
         title="Custom color"
         className={[
           "relative size-6 cursor-pointer overflow-hidden rounded-full transition-transform hover:scale-110",
-          isCustom ? "ring-2 ring-black ring-offset-2 ring-offset-white dark:ring-white dark:ring-offset-black" : "",
+          isCustom ? "ring-2 ring-black ring-offset-2 ring-offset-(--surface) dark:ring-white" : "",
         ].join(" ")}
         style={{
           background: isCustom

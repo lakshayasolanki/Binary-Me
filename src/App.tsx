@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
 import { BinaryCharacter } from "./components/BinaryCharacter/BinaryCharacter";
-import { DEFAULT_BINARY_COLOR } from "./components/BinaryCharacter/binaryRenderer";
-import { ColorDot } from "./components/ColorDot";
-import { ColorPicker } from "./components/ColorPicker";
-import { DebugMaskToggle } from "./components/DebugMaskToggle";
-import { GlowSlider } from "./components/GlowSlider";
+import { DEFAULT_BINARY_COLOR, DEFAULT_INTERACTIONS } from "./components/BinaryCharacter/binaryRenderer";
+import { DebugBar } from "./components/DebugBar";
+import { LanguageButton } from "./components/LanguageButton";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { ScrambleName } from "./components/ScrambleName";
-
 import { useEasedValue } from "./components/useEasedValue";
+
 
 const COLOR_STORAGE_KEY = "binary-color";
 const GLOW_STORAGE_KEY = "binary-glow";
@@ -49,35 +47,49 @@ const loadGlowIntensity = () =>
 
 function AppContent() {
   const [debugMask, setDebugMask] = useState(false);
+  const [crowdBlur, setCrowdBlur] = useState(true);
+  const [interactions, setInteractions] = useState(DEFAULT_INTERACTIONS);
   const [binaryColor, setBinaryColor] = useState(loadBinaryColor);
   const [glowIntensity, setGlowIntensity] = useState(loadGlowIntensity);
-
+  // Hovering the name pushes the crowd further out of focus and lifts the figure's glow a little.
   const [nameHovered, setNameHovered] = useState(false);
   const nameBoost = useEasedValue(nameHovered ? 1 : 0);
 
   useEffect(() => saveStored(COLOR_STORAGE_KEY, binaryColor), [binaryColor]);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--binary-color", binaryColor);
+  }, [binaryColor]);
   useEffect(() => saveStored(GLOW_STORAGE_KEY, String(glowIntensity)), [glowIntensity]);
 
   return (
-    <div className="flex min-h-svh w-full flex-col items-center justify-center gap-10 bg-white px-6 py-12 transition-colors duration-300 dark:bg-black lg:flex-row lg:gap-16">
+    <div className="flex min-h-svh w-full flex-col items-center justify-center gap-10 bg-(--surface) px-6 py-16 transition-colors duration-300">
       <ThemeToggle />
-      <DebugMaskToggle enabled={debugMask} onToggle={() => setDebugMask((v) => !v)} />
-      <div className="pointer-events-none fixed inset-x-4 bottom-4 z-10 flex flex-wrap items-center justify-center gap-2 *:pointer-events-auto">
-        <ColorPicker value={binaryColor} onChange={setBinaryColor} />
-        <GlowSlider value={glowIntensity} onChange={setGlowIntensity} />
+      <DebugBar
+        interactions={{ value: interactions, onChange: setInteractions }}
+        mask={{ enabled: debugMask, onToggle: () => setDebugMask((v) => !v) }}
+        crowdBlur={{ enabled: crowdBlur, onToggle: () => setCrowdBlur((v) => !v) }}
+        color={{ value: binaryColor, onChange: setBinaryColor }}
+        glow={{ value: glowIntensity, onChange: setGlowIntensity }}
+      />
+      <div className="flex w-full items-center justify-center">
+        <BinaryCharacter maxWidth={540} binaryColor={binaryColor} glowIntensity={Math.min(2, glowIntensity * (1 + 0.8 * nameBoost))} theme="dark" debugMask={debugMask} interactions={interactions} crowdBlur={crowdBlur ? 1 : 0} crowdBlurBoost={3 * nameBoost} />
       </div>
-      <div className="flex w-full flex-1 items-center justify-center lg:justify-end">
-        <div
-          onPointerEnter={(e) => e.pointerType !== "touch" && setNameHovered(true)}
-          onPointerLeave={() => setNameHovered(false)}
-        >
-        <ScrambleName>
-          <ColorDot value={binaryColor} onChange={setBinaryColor} />
-        </ScrambleName>
+      <div className="font-sf flex w-full max-w-md flex-col gap-5 text-[0.95rem] leading-relaxed text-neutral-500 transition-colors duration-300 dark:text-neutral-400">
+        <p className="flex items-center gap-1">
+          <span>I'm</span>
+          <span
+            onPointerEnter={(e) => e.pointerType !== "touch" && setNameHovered(true)}
+            onPointerLeave={() => setNameHovered(false)}
+          >
+            <ScrambleName inline>.</ScrambleName>
+          </span>
+        </p>
+        <p>I have eyes which love to observe human-made things which feel natural.</p>
+        <p>I love computers, a machine that can think. So my eyes revolve around computers.</p>
+        <p>Primarily, at this moment, Its all about crafting detailed pixels.</p>
+        <div className="flex items-center gap-3">
+          <LanguageButton />
         </div>
-      </div>
-      <div className="flex w-full flex-1 items-center justify-center lg:justify-start">
-        <BinaryCharacter maxWidth={640} binaryColor={binaryColor} glowIntensity={Math.min(2, glowIntensity * (1 + 0.8 * nameBoost))} crowdBlurBoost={3 * nameBoost} theme="dark" debugMask={debugMask} />
       </div>
     </div>
   );

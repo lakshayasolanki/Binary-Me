@@ -14,10 +14,18 @@
 
 :root {
   color-scheme: light;
+  /* Shared surface color: page background and every control sitting on it. */
+  --surface: #e9ebf0;
 }
 
 :root.dark {
   color-scheme: dark;
+  --surface: #000000;
+}
+
+::selection {
+  background: color-mix(in srgb, color-mix(in srgb, var(--binary-color, #166534) 70%, white) 75%, transparent);
+  color: #000;
 }
 
 body {
@@ -82,4 +90,46 @@ body {
   .scramble-original, .scramble-glyph { transition: none; }
   .scramble-letter[data-active] .scramble-original { opacity: 1; }
   .scramble-letter[data-active] .scramble-glyph { opacity: 0; }
+}
+
+/* Neumorphic button: raised by default, pressed in on :active. Surface matches the page bg. */
+.neu-button {
+  --neu-bg: var(--surface);
+  --neu-light: #ffffff;
+  --neu-dark: #c5c9d3;
+  background: var(--neu-bg);
+  box-shadow: 4px 4px 8px var(--neu-dark), -4px -4px 8px var(--neu-light);
+}
+.neu-button:active {
+  box-shadow: inset 3px 3px 6px var(--neu-dark), inset -3px -3px 6px var(--neu-light);
+}
+:root.dark .neu-button {
+  --neu-light: #222427;
+  --neu-dark: #000000;
+}
+
+/* Shared icon-button behaviour (theme, language, sound): same color, hover, press and focus. */
+.icon-btn {
+  color: var(--color-neutral-500);
+  transition: color 100ms ease-out, transform 100ms ease-out;
+}
+:root.dark .icon-btn { color: var(--color-neutral-400); }
+@media (hover: hover) {
+  .icon-btn:hover { color: #000; }
+  :root.dark .icon-btn:hover { color: #fff; }
+}
+.icon-btn:active { transform: scale(0.92); }
+/* While a button animates (and while pressed) its glyphs take the binary color. */
+.icon-btn[data-animating="true"], .icon-btn:active,
+:root.dark .icon-btn[data-animating="true"], :root.dark .icon-btn:active {
+  color: var(--binary-color, #166534);
+}
+.icon-btn:focus-visible {
+  outline: 2px solid var(--binary-color, #166534);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn { transition: none; }
 }
