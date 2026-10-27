@@ -166,7 +166,18 @@ export interface GlyphPalette {
   steps: string[];
   /** Lightened accent used for bloom / halo tinting. */
   glow: string;
+  /** `steps` blended toward a vivid green, one row per lift level (row 0 is `steps`). Glyphs lifted by hover,
+   *  charge or the burst use a higher row so the glow reads green rather than pastel-to-white. */
+  lifted: string[][];
+  /** Bloom color for lifted glyphs. */
+  glowLifted: string;
 }
+
+/** Rows of `GlyphPalette.lifted` above 0, and the brightness lift (0-1 ramp units) that reaches the last row. */
+const LIFT_LEVELS = 4;
+const LIFT_FULL = 0.15;
+/** Lightness of the vivid green lifted glyphs head for (a pale ~0.78 green turns white; ~0.6 stays green). */
+const LIFTED_LIGHTNESS = 0.6;
 
 /**
  * Builds a dim -> bright color ramp from a single seed color, driven entirely through HSL
@@ -197,15 +208,32 @@ export function buildPalette(hex: string, theme: "light" | "dark" = "dark"): Gly
       : hslToRgb(hue, clamp(sat * 1.1, 0, 1), 0.78);
 
   const steps: string[] = [];
+  const stepRgb: Rgb[] = [];
   for (let i = 0; i < PALETTE_STEPS; i++) {
-    steps.push(rgbToCss(mixRgb(dim, bright, i / (PALETTE_STEPS - 1))));
+    const rgbStep = mixRgb(dim, bright, i / (PALETTE_STEPS - 1));
+    stepRgb.push(rgbStep);
+    steps.push(rgbToCss(rgbStep));
+  }
+
+  // Same ramp, but its hot end is a saturated mid-lightness green; lifted glyphs blend toward it.
+  const vividBright =
+    theme === "light" ? bright : hslToRgb(hue, clamp(sat * 1.3, 0, 1), LIFTED_LIGHTNESS);
+  const lifted: string[][] = [steps];
+  for (let k = 1; k <= LIFT_LEVELS; k++) {
+    lifted.push(
+      stepRgb.map((rgbStep, i) =>
+        rgbToCss(mixRgb(rgbStep, mixRgb(dim, vividBright, i / (PALETTE_STEPS - 1)), k / LIFT_LEVELS)),
+      ),
+    );
   }
 
   const glow =
     theme === "light"
       ? hslToRgb(hue, clamp(sat * 1.05, 0, 1), 0.4)
       : hslToRgb(hue, clamp(sat * 1.15, 0, 1), 0.58);
-  return { steps, glow: rgbToCss(glow) };
+  const glowLifted =
+    theme === "light" ? glow : hslToRgb(hue, clamp(sat * 1.3, 0, 1), 0.5);
+  return { steps, glow: rgbToCss(glow), lifted, glowLifted: rgbToCss(glowLifted) };
 }
 
 /**
@@ -963,12 +991,15 @@ export function createBinaryField(
         }
 
         const stepIndex = clamp(Math.round(brightness * lastStep), 0, lastStep);
-        ctx.fillStyle = palette.steps[stepIndex];
+        // Only the brightness added by hover/charge/burst turns vivid, so resting glyphs keep their own shade.
+        const lift = brightness - glyph.brightness;
+        const liftRow = lift > 0 ? Math.min(LIFT_LEVELS, Math.ceil((lift / LIFT_FULL) * LIFT_LEVELS)) : 0;
+        ctx.fillStyle = palette.lifted[liftRow][stepIndex];
         const baseAlpha = clamp(0.24 + brightness * 0.78, 0.18, 1);
         ctx.globalAlpha = clamp(baseAlpha * glyph.alphaNoise, 0.05, 1) * resolved.opacity;
 
         if (bloomBrightness > BLOOM_THRESHOLD) {
-          ctx.shadowColor = palette.glow;
+          ctx.shadowColor = liftRow > 0 ? palette.glowLifted : palette.glow;
           ctx.shadowBlur = maxBloom * ((bloomBrightness - BLOOM_THRESHOLD) / (1 - BLOOM_THRESHOLD));
         } else {
           ctx.shadowBlur = 0;

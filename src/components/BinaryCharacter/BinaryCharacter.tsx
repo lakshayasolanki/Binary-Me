@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import maskUrl from "../../assets/binary-character/person-mask.webp";
 import {
+  buildPalette,
   computeMaskBounds,
   createBinaryField,
   DEFAULT_BINARY_COLOR,
@@ -23,6 +24,8 @@ const DEBUG_MASK_COLOR = "#ff00ff";
 /** How much the halo (the outer outline) brightens at full hover. On a light backdrop the
  *  halo multiplies, so it is darkened instead to read stronger. */
 const HALO_HOVER_GAIN = 0.6;
+/** Ceiling for the halo brightness filter on a dark backdrop; beyond it the green starts to clip toward white. */
+const HALO_MAX_BRIGHTNESS = 1.45;
 
 /** Feathers all four edges of the component into the page; the two gradients are intersected. */
 const EDGE_FADE_MASK =
@@ -221,7 +224,22 @@ export function BinaryCharacter({
       theme,
     }, (amount) => {
       const level = theme === "light" ? 1 - (HALO_HOVER_GAIN / 2) * amount : 1 + HALO_HOVER_GAIN * amount;
-      glowCanvas.style.filter = amount > 0 ? `brightness(${level})` : "";
+      if (amount <= 0) {
+        glowCanvas.style.filter = "";
+        return;
+      }
+      if (theme === "light") {
+        glowCanvas.style.filter = `brightness(${level})`;
+        return;
+      }
+      // Brightness multiplies every channel, so a high level (hover + name + charge + burst stack up) clips the
+      // green to white. Cap it, keep the colour rich with saturate, and add the extra light as a green bloom.
+      // Every term is the identity at amount 0 (the bloom's size and opacity both start from nothing), so the halo
+      // eases in and out with the glow instead of popping.
+      const lift = Math.min(amount, 1.5);
+      const fade = Math.min(amount, 1);
+      const [r, g, b] = buildPalette(colorRef.current, theme).glow.match(/\d+/g)!;
+      glowCanvas.style.filter = `brightness(${Math.min(level, HALO_MAX_BRIGHTNESS)}) saturate(${1 + 0.9 * lift}) drop-shadow(0 0 ${5 * fade}px rgba(${r}, ${g}, ${b}, ${fade}))`;
     });
 
     let maskBounds: Bounds | null = null;
