@@ -1,0 +1,67 @@
+/* The otter's colors. Every fill and stroke in OtterArt reads one of these. */
+.otter-svg[data-theme="light"] {
+  --o-line: #54393a;
+  --o-fur: #c9beb8;
+  --o-cream: #f6efe6;
+  --o-pad: #d3c8c1;
+  --o-ear: #968782;
+  --o-ear-in: #a79991;
+  --o-ink: #3b1611;
+  --o-blush: #f8c6b6;
+  --o-lid-a: #5a5159;
+  --o-lid-b: #4c444c;
+  --o-lid-hi: #7d7785;
+  --o-deck: #4a3b3d;
+  --o-logo: #bdb6b9;
+  --o-tick: #e3ad92;
+}
+
+.otter-svg svg { overflow: visible; display: block; }
+.otter-svg .o-body { fill: var(--o-fur); stroke: var(--o-line); stroke-width: 9.5; stroke-linejoin: round; }
+.otter-svg .o-stroke { fill: none; stroke: var(--o-line); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+.otter-svg .o-pad { fill: var(--o-pad); }
+.otter-svg .o-lid { stroke: var(--o-line); stroke-width: 10; stroke-linejoin: round; }
+.otter-svg .o-bevel { fill: none; stroke: var(--o-lid-hi); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: .75; }
+.otter-svg .o-logo { fill: var(--o-logo); }
+.otter-svg .o-beak { fill: var(--o-line); }
+.otter-svg .o-deck { fill: var(--o-deck); stroke: var(--o-line); stroke-width: 5; stroke-linejoin: round; }
+.otter-svg .o-ear { fill: none; stroke: var(--o-ear); stroke-width: 10; }
+.otter-svg .o-ear-in { fill: var(--o-ear-in); }
+.otter-svg .o-ear-far { fill: none; stroke: var(--o-ear); stroke-width: 7; stroke-linecap: round; opacity: .55; }
+.otter-svg .o-nose, .otter-svg .o-eye, .otter-svg .o-ink { fill: var(--o-ink); }
+.otter-svg .o-blush { fill: var(--o-blush); opacity: .75; }
+.otter-svg .o-ticks { fill: none; stroke: var(--o-tick); stroke-width: 12; stroke-linecap: round; }
+
+.otter-svg[data-theme="dark"] {
+  --o-line: #1d1519;
+  --o-fur: #9a95a3;
+  --o-cream: #d9d5df;
+  --o-pad: #aaa5b3;
+  --o-ear: #77727f;
+  --o-ear-in: #858090;
+  --o-ink: #0d0709;
+  --o-blush: #f3a99a;
+  --o-lid-a: #3b3a4d;
+  --o-lid-b: #2e2d3d;
+  --o-lid-hi: #6a6a85;
+  --o-deck: #2a2733;
+  --o-logo: #c9c6d3;
+  --o-tick: #f0a27a;
+}
+
+/* Button reset: the art defines the size, the box hugs the sitting pose. */
+.otter-svg { all: unset; display: inline-block; cursor: pointer; line-height: 0; -webkit-tap-highlight-color: transparent; }
+.otter-svg:focus-visible { outline: 2px solid var(--binary-color, #166534); outline-offset: 3px; border-radius: 6px; }
+.otter-svg:active { transform: scale(0.95); }
+.otter-svg .o-body, .otter-svg .o-pad, .otter-svg .o-lid, .otter-svg .o-ear, .otter-svg .o-eye, .otter-svg .o-nose { transition: fill 400ms, stroke 400ms; }
+
+.o-talk { fill: #7a2b2b; opacity: 0; transform-box: fill-box; transform-origin: top center; }
+.otter-svg[data-speaking="true"] .o-talk { opacity: 1; animation: o-talk 0.26s ease-in-out infinite alternate; }
+.otter-svg .o-eye { transform-box: fill-box; transform-origin: center; animation: o-blink 5s infinite; }
+.otter-svg .o-sit { transform-box: fill-box; transform-origin: 50% 100%; animation: o-breathe 3.6s ease-in-out infinite; }
+@keyframes o-talk { from { transform: scaleY(0.3); } to { transform: scaleY(1.1); } }
+@keyframes o-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.08); } }
+@keyframes o-breathe { 50% { transform: scale(1.008, 1.018); } }
+@media (prefers-reduced-motion: reduce) {
+  .otter-svg .o-eye, .otter-svg .o-sit, .otter-svg[data-speaking="true"] .o-talk { animation: none; }
+}
