@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BinaryCharacter } from "./components/BinaryCharacter/BinaryCharacter";
 import { DEFAULT_BINARY_COLOR, DEFAULT_INTERACTIONS } from "./components/BinaryCharacter/binaryRenderer";
 import { DebugBar } from "./components/DebugBar";
 import { LanguageButton } from "./components/LanguageButton";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { useTheme } from "./theme/ThemeContext";
+import Otter, { type OtterHandle } from "./components/Otter";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { ScrambleName } from "./components/ScrambleName";
 import { useEasedValue } from "./components/useEasedValue";
@@ -46,6 +48,8 @@ const loadGlowIntensity = () =>
   );
 
 function AppContent() {
+  const { theme } = useTheme();
+  const otter = useRef<OtterHandle>(null);
   const [debugMask, setDebugMask] = useState(false);
   const [crowdBlur, setCrowdBlur] = useState(true);
   const [interactions, setInteractions] = useState(DEFAULT_INTERACTIONS);
@@ -78,10 +82,16 @@ function AppContent() {
         <p className="flex items-center gap-1">
           <span>I'm</span>
           <span
-            onPointerEnter={(e) => e.pointerType !== "touch" && setNameHovered(true)}
+            onPointerEnter={(e) => {
+              otter.current?.greet();
+              if (e.pointerType !== "touch") setNameHovered(true);
+            }}
             onPointerLeave={() => setNameHovered(false)}
           >
             <ScrambleName inline>.</ScrambleName>
+          </span>
+          <span className="-my-2.5 ml-1 shrink-0">
+            <Otter ref={otter} size={42} theme={theme} mat={false} />
           </span>
         </p>
         <p>I have eyes which love to observe human-made things which feel natural.</p>

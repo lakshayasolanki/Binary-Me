@@ -1,0 +1,179 @@
+/* <Otter> — layout-neutral. The button hugs the typing pose; every frame shares one
+   canvas that overflows it (visible), so other poses never shift layout.
+
+   Public custom properties (set on .otter or any ancestor):
+     --otter-mat-light-{center,mid,rim,fade,contact}   light mat colors
+     --otter-mat-dark-{center,mid,rim,fade,contact}    dark ("glowing") mat colors
+     --otter-mat-light-grain / --otter-mat-dark-grain  paper grain strength (0 = off)
+     --otter-mat-opacity                               mat opacity (default 1)
+     --otter-focus-color                               focus ring color
+     --otter-theme-duration                            light ↔ dark switch (default 600ms)
+   Public vars are only ever read here (with fallbacks), never declared, so an ancestor can
+   set them. Everything named --_otter-* is internal and may change.
+
+   Mat color defaults arrive inline as --_otter-sampled-*, per theme: sampled from each
+   theme's reference art by scripts/cut-otter-frames.py and un-mixed from its background
+   (white paper / navy), so the fade is real transparency on any page.
+
+   Styling hooks on the button: data-state (greeting|typing|reacting|thinking|sleeping),
+   data-theme (light|dark, the one shown), data-grudge, data-paused. */
+.otter {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-block;
+  position: relative;
+  width: var(--_otter-size, 160px);
+  aspect-ratio: var(--_otter-aspect);
+  overflow: visible;
+  cursor: pointer;
+  border-radius: 18%;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: box-shadow 160ms ease;
+}
+.otter:hover,
+.otter:active { background: transparent; }
+.otter:focus { outline: none; }
+.otter:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 250, 244, 0.9), 0 0 0 5px var(--otter-focus-color, rgba(221, 132, 132, 0.6)), 0 0 16px 4px var(--otter-focus-color, rgba(221, 132, 132, 0.45));
+}
+
+.otter__canvas {
+  position: absolute;
+  left: var(--_otter-canvas-x);
+  top: var(--_otter-canvas-y);
+  width: var(--_otter-canvas-w);
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+
+.otter__fade,
+.otter__body,
+.otter__pop,
+.otter__theme,
+.otter__matlayer,
+.otter__matbloom {
+  position: absolute;
+  inset: 0;
+  transform-origin: var(--_otter-origin);
+}
+/* Light ↔ dark: Otter.jsx drives --_otter-mat-mix / --_otter-art-mix (0 light → 1 dark) and
+   --_otter-mat-bloom each frame. Opacity only — gradient colors are never animated. */
+.otter__matlayer[data-theme='light'] { opacity: calc(1 - var(--_otter-mat-mix, 0)); }
+.otter__matlayer[data-theme='dark'] { opacity: var(--_otter-mat-mix, 0); }
+.otter__matlayer[data-theme='dark'] .otter__matbloom {
+  transform-origin: var(--_otter-mat-x) var(--_otter-mat-y);
+  scale: var(--_otter-mat-bloom, 1); /* separate from the mat's own widening transition */
+}
+.otter__theme[data-theme='light'] { opacity: calc(1 - var(--_otter-art-mix, 0)); }
+.otter__theme[data-theme='dark'] { opacity: var(--_otter-art-mix, 0); }
+/* First paint: mat only; the otter fades in once the critical frames are decoded. */
+.otter__fade { opacity: 0; transition: opacity 280ms ease-out; }
+.otter__fade[data-ready] { opacity: 1; }
+
+/* Every image is tight-cropped; its rect inside the canvas comes from frameMeta.js. */
+.otter__frame,
+.otter__layer {
+  position: absolute;
+  -webkit-user-drag: none;
+}
+.otter__frame {
+  opacity: 0;
+  transition: opacity var(--_otter-swap-ms, 150ms) ease-out;
+}
+.otter__frame--stack { inset: 0; }
+.otter__frame[data-active] { opacity: 1; }
+
+/* ---- floor mat ---- */
+.otter__matlayer[data-theme='light'] {
+  --_otter-m-center: var(--otter-mat-light-center, var(--_otter-sampled-center));
+  --_otter-m-mid: var(--otter-mat-light-mid, var(--_otter-sampled-mid));
+  --_otter-m-rim: var(--otter-mat-light-rim, var(--_otter-sampled-rim));
+  --_otter-m-fade: var(--otter-mat-light-fade, var(--_otter-sampled-fade));
+  --_otter-m-contact: var(--otter-mat-light-contact, var(--_otter-sampled-contact));
+  --_otter-m-grain: var(--otter-mat-light-grain, 0.28);
+}
+/* Dark: the mat glows — brighter, more saturated blue sampled from the dark art. */
+.otter__matlayer[data-theme='dark'] {
+  --_otter-m-center: var(--otter-mat-dark-center, var(--_otter-sampled-center));
+  --_otter-m-mid: var(--otter-mat-dark-mid, var(--_otter-sampled-mid));
+  --_otter-m-rim: var(--otter-mat-dark-rim, var(--_otter-sampled-rim));
+  --_otter-m-fade: var(--otter-mat-dark-fade, var(--_otter-sampled-fade));
+  --_otter-m-contact: var(--otter-mat-dark-contact, var(--_otter-sampled-contact));
+  --_otter-m-grain: var(--otter-mat-dark-grain, 0.12);
+}
+.otter__mat {
+  position: absolute;
+  left: var(--_otter-mat-x);
+  top: var(--_otter-mat-y);
+  width: var(--_otter-mat-w);
+  height: var(--_otter-mat-h);
+  translate: -50% -50%;
+  scale: var(--_otter-mat-sx, 1) 1;
+  transition: scale var(--_otter-mat-ms, 300ms) ease;
+  opacity: var(--otter-mat-opacity, 1);
+  border-radius: 50%;
+  background: radial-gradient(closest-side,
+    var(--_otter-m-center) 0%,
+    var(--_otter-m-center) 12%,
+    var(--_otter-m-mid) 50%,
+    var(--_otter-m-rim) 77%,
+    var(--_otter-m-fade) 92%,
+    transparent 100%);
+}
+/* Darker contact patch right under where he sits. */
+.otter__mat::before {
+  content: '';
+  position: absolute;
+  left: var(--_otter-contact-x);
+  top: 50%;
+  width: var(--_otter-contact-w);
+  height: 30%;
+  translate: -50% -50%;
+  scale: calc(1 / var(--_otter-mat-sx, 1)) 1; /* stays put while the mat widens */
+  transition: scale var(--_otter-mat-ms, 300ms) ease;
+  background: radial-gradient(closest-side, var(--_otter-m-contact), transparent);
+}
+/* Paper grain: light flecks where the crayon skipped. */
+.otter__mat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  opacity: var(--_otter-m-grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -2.2 1.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+}
+
+/* ---- ambient motion (skipped entirely under prefers-reduced-motion) ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .otter__pop[data-pop='0'] { animation: otter-pop-a var(--_otter-swap-ms, 150ms) ease-out; }
+  .otter__pop[data-pop='1'] { animation: otter-pop-b var(--_otter-swap-ms, 150ms) ease-out; }
+
+  .otter[data-state='typing'] .otter__body {
+    animation: otter-breathe 3.6s ease-in-out infinite, otter-bob 9s ease-in-out infinite;
+  }
+  .otter[data-state='thinking'] .otter__body { animation: otter-breathe 4.2s ease-in-out infinite; }
+  .otter[data-state='sleeping'] .otter__body { animation: otter-breathe 5.5s ease-in-out infinite; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .otter__mat, .otter__mat::before { transition: none; }
+}
+/* Offscreen / hidden tab: freeze ambient motion too (typingRhythm stops itself). */
+.otter[data-paused] .otter__body,
+.otter[data-paused] .otter__pop { animation-play-state: paused; }
+
+/* Two identical keyframes so alternating names restarts the animation. */
+@keyframes otter-pop-a { 0% { scale: 1.035 0.955; } 60% { scale: 0.99 1.015; } 100% { scale: 1; } }
+@keyframes otter-pop-b { 0% { scale: 1.035 0.955; } 60% { scale: 0.99 1.015; } 100% { scale: 1; } }
+
+@keyframes otter-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.008, 1.018); } }
+
+/* Pivot at the floor, so a tiny tilt reads as a head bob. Mostly still. Uses rotate/translate
+   (not transform) so it stacks with otter-breathe. */
+@keyframes otter-bob {
+  0%, 70%, 82%, 100% { rotate: 0deg; translate: 0 0; }
+  74% { rotate: -1.2deg; translate: 0 -1%; }
+  78% { rotate: 0.6deg; translate: 0 0; }
+}
