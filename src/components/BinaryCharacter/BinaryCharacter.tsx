@@ -395,7 +395,7 @@ export function BinaryCharacter({
     <div
       ref={wrapperRef}
       className={[
-        "relative w-full overflow-hidden bg-(--surface)",
+        "relative w-full overflow-hidden bg-(--surface) transition-colors duration-300",
         className,
       ]
         .filter(Boolean)

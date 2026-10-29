@@ -28,6 +28,17 @@
   color: #000;
 }
 
+:root.dark ::selection {
+  background: color-mix(in srgb, var(--binary-color, #166534) 55%, transparent);
+  color: #fff;
+}
+
+html,
+body {
+  background: var(--surface);
+  transition: background-color 300ms;
+}
+
 body {
   font-synthesis: none;
   text-rendering: optimizeLegibility;
