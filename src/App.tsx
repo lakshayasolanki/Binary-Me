@@ -52,6 +52,7 @@ function AppContent() {
   const otter = useRef<OtterHandle>(null);
   const [debugMask, setDebugMask] = useState(false);
   const [crowdBlur, setCrowdBlur] = useState(true);
+  const [crowdCosmic, setCrowdCosmic] = useState(false);
   const [interactions, setInteractions] = useState(DEFAULT_INTERACTIONS);
   const [binaryColor, setBinaryColor] = useState(loadBinaryColor);
   const [glowIntensity, setGlowIntensity] = useState(loadGlowIntensity);
@@ -72,11 +73,12 @@ function AppContent() {
         interactions={{ value: interactions, onChange: setInteractions }}
         mask={{ enabled: debugMask, onToggle: () => setDebugMask((v) => !v) }}
         crowdBlur={{ enabled: crowdBlur, onToggle: () => setCrowdBlur((v) => !v) }}
+        crowdCosmic={{ enabled: crowdCosmic, onToggle: () => setCrowdCosmic((v) => !v) }}
         color={{ value: binaryColor, onChange: setBinaryColor }}
         glow={{ value: glowIntensity, onChange: setGlowIntensity }}
       />
       <div className="flex w-full items-center justify-center">
-        <BinaryCharacter maxWidth={540} binaryColor={binaryColor} glowIntensity={Math.min(2, glowIntensity * (1 + 0.8 * nameBoost))} theme="dark" debugMask={debugMask} interactions={interactions} crowdBlur={crowdBlur ? 1 : 0} crowdBlurBoost={3 * nameBoost} />
+        <BinaryCharacter key={crowdCosmic ? "cosmic" : "plain"} maxWidth={540} binaryColor={binaryColor} glowIntensity={Math.min(2, glowIntensity * (1 + 0.8 * nameBoost))} theme="dark" debugMask={debugMask} interactions={interactions} crowdBlur={crowdBlur ? 1 : 0} crowdBlurBoost={3 * nameBoost} crowdCosmic={crowdCosmic} />
       </div>
       <div className="font-sf flex w-full max-w-md flex-col gap-5 text-[0.95rem] leading-relaxed text-neutral-500 transition-colors duration-300 dark:text-neutral-400">
         <p className="flex items-center gap-1">

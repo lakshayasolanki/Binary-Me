@@ -1,6 +1,6 @@
 import type { BinaryInteractions } from "./BinaryCharacter/binaryRenderer";
 import { useState } from "react";
-import { CrowdBlurToggle, type CrowdBlurToggleProps } from "./CrowdBlurToggle";
+import { CrowdBlurToggle, CrowdCosmicToggle, type CrowdBlurToggleProps } from "./CrowdBlurToggle";
 import { ColorPicker, type ColorPickerProps } from "./ColorPicker";
 import { DebugMaskToggle, type DebugMaskToggleProps } from "./DebugMaskToggle";
 import { GlowSlider, type GlowSliderProps } from "./GlowSlider";
@@ -20,13 +20,14 @@ export interface DebugBarProps {
   interactions: InteractionTogglesProps;
   mask: DebugMaskToggleProps;
   crowdBlur: CrowdBlurToggleProps;
+  crowdCosmic: CrowdBlurToggleProps;
   color: ColorPickerProps;
   glow: GlowSliderProps;
 }
 
 /** Dev tools (mask overlay, crowd blur, interaction toggles, color palette, glow) kept together in one bar at the top left,
  *  with a tab button flush against the left edge of the page to show/hide it. */
-export function DebugBar({ mask, crowdBlur, color, glow, interactions }: DebugBarProps) {
+export function DebugBar({ mask, crowdBlur, crowdCosmic, color, glow, interactions }: DebugBarProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -49,6 +50,7 @@ export function DebugBar({ mask, crowdBlur, color, glow, interactions }: DebugBa
         >
           <DebugMaskToggle {...mask} />
           <CrowdBlurToggle {...crowdBlur} />
+          <CrowdCosmicToggle {...crowdCosmic} />
           {(Object.keys(INTERACTION_LABELS) as (keyof BinaryInteractions)[]).map((key) => (
             <button
               key={key}

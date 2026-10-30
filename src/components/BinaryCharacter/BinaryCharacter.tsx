@@ -39,6 +39,8 @@ export interface BinaryCharacterProps extends BinaryFieldOptions {
   crowdBlur?: number;
   /** Extra crowd blur added at any time, including mid-entrance (e.g. while the name is hovered). */
   crowdBlurBoost?: number;
+  /** Long-exposure smear with ghost trails on the crowd; off keeps only the faint original residue. */
+  crowdCosmic?: boolean;
   /** Dev-only: paints person-mask.png as a flat, opaque color using the exact same
    *  drawImage-based mask compositing as the backing and digit field (see renderMaskFill), so
    *  the mask's silhouette can be checked by eye against the crowd photo underneath. Off by
@@ -65,6 +67,7 @@ export function BinaryCharacter({
   maxWidth,
   crowdBlur = 1,
   crowdBlurBoost = 0,
+  crowdCosmic = false,
   streamCount,
   minSpeed,
   maxSpeed,
@@ -98,10 +101,12 @@ export function BinaryCharacter({
   const glowIntensityRef = useRef(glowIntensity);
   const controllerRef = useRef<BinaryFieldController | null>(null);
   const interactionsRef = useRef(interactions);
+  const cosmicRef = useRef(crowdCosmic);
+  cosmicRef.current = crowdCosmic;
   const crowdImgRef = useRef<HTMLCanvasElement>(null);
   const crowdBackRef = useRef<HTMLCanvasElement>(null);
   const crowdFrontRef = useRef<HTMLCanvasElement>(null);
-  const { definition: finishDefinition, style: finishStyle, setTime: setFinishTime } = useCrowdFinish(crowdBlur, wrapperRef, crowdBlurBoost);
+  const { definition: finishDefinition, style: finishStyle, setTime: setFinishTime } = useCrowdFinish(crowdBlur, wrapperRef, crowdBlurBoost, crowdCosmic);
   // Reveal either the prepared first pose or the still reference, so the final composition
   // never flashes before the entrance. Normal preparation has a short, bounded deadline.
   useEffect(() => {
@@ -161,6 +166,7 @@ export function BinaryCharacter({
         controller = createCrowdEntrance({
           backCanvas, frontCanvas, layers,
           stillOnly,
+          isCosmic: () => cosmicRef.current,
           onPreparedSource: still => {
             img.width = still.width; img.height = still.height;
             img.getContext("2d")?.drawImage(still, 0, 0);

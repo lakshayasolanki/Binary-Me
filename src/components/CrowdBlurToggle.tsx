@@ -17,3 +17,18 @@ export function CrowdBlurToggle({ enabled, onToggle }: CrowdBlurToggleProps) {
     </button>
   );
 }
+
+/** Debug control for the stronger long-exposure smear and ghost trails on the crowd. */
+export function CrowdCosmicToggle({ enabled, onToggle }: CrowdBlurToggleProps) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="rounded-full border border-black/10 bg-(--surface) px-4 py-2 text-sm font-medium text-black shadow-sm transition-colors hover:brightness-95 dark:border-white/15 dark:text-white dark:hover:brightness-125"
+      aria-pressed={enabled}
+      aria-label="Toggle crowd cosmic smear"
+    >
+      {enabled ? "Crowd cosmic: on" : "Crowd cosmic: off"}
+    </button>
+  );
+}

@@ -6,6 +6,8 @@ import { crowdDebug } from "./crowdDebug";
 export { ENTRANCE_DURATION } from "./crowdMotion";
 
 interface Options {
+  /** Read every frame so the entrance follows the cosmic toggle. */
+  isCosmic?: () => boolean;
   backCanvas: HTMLCanvasElement;
   frontCanvas: HTMLCanvasElement;
   layers: CrowdLayer[];
@@ -105,7 +107,7 @@ function createPlane(canvas: HTMLCanvasElement, layers: CrowdLayer[]) {
     return { layer, buffer, texture, count: vertices.length / 4 };
   });
   return {
-    draw(t: number) {
+    draw(t: number, cosmic: boolean) {
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const w = Math.max(1, Math.round(rect.width * dpr));
@@ -115,7 +117,7 @@ function createPlane(canvas: HTMLCanvasElement, layers: CrowdLayer[]) {
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(program);
       for (const { layer, buffer, texture, count } of meshes) {
-        const pose = sampleCrowdMotion(t, layer.person);
+        const pose = sampleCrowdMotion(t, layer.person, cosmic);
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.enableVertexAttribArray(position); gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 16, 0);
         gl.enableVertexAttribArray(uv); gl.vertexAttribPointer(uv, 2, gl.FLOAT, false, 16, 8);
@@ -172,7 +174,7 @@ export function createCrowdEntrance(options: Options) {
   let settled = false;
   let startTime: number | null = null;
   let lastTime = 0;
-  const render = (t: number) => { back.draw(t); front.draw(t); options.onFrame?.(t); lastTime = t; };
+  const render = (t: number) => { const cosmic = options.isCosmic?.() ?? false; back.draw(t, cosmic); front.draw(t, cosmic); options.onFrame?.(t); lastTime = t; };
   const resize = new ResizeObserver(() => { if (began && !destroyed && !settled) render(lastTime); });
   const removeContextListeners = () => {
     options.backCanvas.removeEventListener("webglcontextlost", contextLost);
