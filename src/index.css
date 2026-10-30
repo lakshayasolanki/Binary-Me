@@ -144,3 +144,180 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .icon-btn { transition: none; }
 }
+
+/* Two leaves: desaturated at rest, alive with color and a soft glow on hover. */
+.leaves {
+  overflow: visible;
+  --leaf-edge: #1c1f1f;
+  --leaf-vein: #f3f4f4;
+  --leaf-a-light: #7d8282;
+  --leaf-a-dark: #3a3e3e;
+  --leaf-a-under-light: #a9adad;
+  --leaf-a-under-dark: #6b7070;
+  --leaf-b-light: #8f9494;
+  --leaf-b-dark: #4d5252;
+  --leaf-b-under-light: #b8bcbc;
+  --leaf-b-under-dark: #7a7f7f;
+  filter: drop-shadow(0 1.5px 0 rgb(0 0 0 / .25)) drop-shadow(0 3px 2.5px rgb(0 0 0 / .32));
+  transition: filter 300ms ease;
+}
+.dark .leaves {
+  --leaf-edge: #070808;
+  --leaf-a-light: #d6d9d9;
+  --leaf-a-dark: #8b9090;
+  --leaf-a-under-light: #eceeee;
+  --leaf-a-under-dark: #b0b5b5;
+  --leaf-b-light: #e4e6e6;
+  --leaf-b-dark: #9ca1a1;
+  --leaf-b-under-light: #f3f4f4;
+  --leaf-b-under-dark: #c2c6c6;
+}
+.leaves__back { display: none; }
+.leaves stop { transition: stop-color 250ms ease; }
+.leaves [stroke] { transition: stroke 250ms ease; }
+.leaves-host:hover .leaves, .leaves-host[data-active="true"] .leaves {
+  --leaf-edge: #0b3d2a;
+  --leaf-vein: #e8fff2;
+  --leaf-a-light: #5be3a0;
+  --leaf-a-dark: #0e8a55;
+  --leaf-a-under-light: #b5f2d2;
+  --leaf-a-under-dark: #4dbd8a;
+  --leaf-b-light: #ffcf5e;
+  --leaf-b-dark: #d9631a;
+  --leaf-b-under-light: #ffe7a8;
+  --leaf-b-under-dark: #eba04a;
+  filter: drop-shadow(0 0 3px rgb(52 211 153 / .55)) drop-shadow(0 1.5px 0 rgb(0 0 0 / .22)) drop-shadow(0 3px 2.5px rgb(0 0 0 / .26));
+}
+.leaves-host:hover .leaves__b { --leaf-edge: #6b2a05; }
+
+/* Compact monochrome terminal; the keyboard comes forward on hover. */
+.computer {
+  overflow: visible;
+  color: #202424;
+  --computer-case-light: currentColor;
+  --computer-case-dark: currentColor;
+  --computer-base-light: currentColor;
+  --computer-base-dark: currentColor;
+  --computer-bezel: #555959;
+  --computer-glass-light: #292d2d;
+  --computer-glass-dark: #292d2d;
+  --computer-prompt: #d0d3d3;
+  --computer-detail: #969b9b;
+  --computer-slot: #414646;
+  --computer-keys: #969b9b;
+}
+.dark .computer { color: #e5e5e5; }
+.computer {
+  filter: drop-shadow(0 1.5px 0 rgb(0 0 0 / .25)) drop-shadow(0 3px 2.5px rgb(0 0 0 / .32));
+  transform: perspective(90px) rotateY(18deg) rotateX(-5deg);
+  transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+/* A dark shadow disappears on the dark page, so there the depth comes from a thin rim light and a faint glow. */
+.dark .computer { filter: drop-shadow(0 0 0.5px rgb(255 255 255 / .5)) drop-shadow(0 2px 6px rgb(255 255 255 / .13)); }
+.computer__monitor {
+  transform-origin: 32px 26px;
+  transform: translateY(8px);
+  transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.computer__screen, .computer__chevron, .computer__cursor, .computer__keys > * { transform-box: fill-box; transform-origin: center; }
+.computer__chevron { stroke-dasharray: 1; }
+.computer__keyboard {
+  opacity: 0;
+  transform-origin: 32px 48px;
+  transform: translateY(-9px) scale(.95);
+  transition: transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 160ms ease;
+}
+@keyframes computer-power-on {
+  0% { transform: scale(1, .02); filter: brightness(3); }
+  35% { transform: scale(1, .02); filter: brightness(3); }
+  55% { transform: scale(1.04, 1.06); filter: brightness(1.8); }
+  75% { transform: scale(1); filter: brightness(.8); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@keyframes computer-type-chevron {
+  0%, 55% { stroke-dashoffset: 1; }
+  80%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes computer-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes computer-key-tap {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(.7px); }
+}
+.computer stop { transition: stop-color 180ms ease; }
+.computer [fill] { transition: fill 180ms ease; }
+.computer [stroke] { transition: stroke 180ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .computer-host:hover .computer {
+    --computer-case-light: #f2e5ca;
+    --computer-case-dark: #ded0b4;
+    --computer-base-light: #d6c8ac;
+    --computer-base-dark: #c7b99e;
+    --computer-bezel: #cfc2a8;
+    --computer-glass-light: #303638;
+    --computer-glass-dark: #383d3d;
+    --computer-prompt: #04ed52;
+    --computer-detail: #343a3b;
+    --computer-slot: #bcaf95;
+    --computer-keys: #a69c87;
+  }
+  .computer-host:hover .computer { transform: perspective(90px) rotateY(8deg) rotateX(-2deg); }
+  .computer-host:hover .computer__monitor { transform: translateY(-2px) scale(.9); }
+  .computer-host:hover .computer__keyboard { opacity: 1; transform: translateY(0) scale(1); }
+  .computer-host:hover .computer__screen { animation: computer-power-on 520ms cubic-bezier(0.23, 1, 0.32, 1) 120ms backwards; }
+  .computer-host:hover .computer__chevron { animation: computer-type-chevron 700ms steps(6, end) 120ms backwards; }
+  .computer-host:hover .computer__cursor { animation: computer-blink 900ms steps(1) 700ms infinite; }
+  .computer-host:hover .computer__keys > * { animation: computer-key-tap 380ms ease-in-out infinite; }
+  .computer-host:hover .computer__keys > :nth-child(2) { animation-delay: 90ms; }
+  .computer-host:hover .computer__keys > :nth-child(3) { animation-delay: 210ms; }
+  .computer-host:hover .computer__keys > :nth-child(4) { animation-delay: 150ms; }
+  .computer-host:hover .computer__keys > :nth-child(5) { animation-delay: 260ms; }
+  .computer-host:hover .computer__keys > :nth-child(6) { animation-delay: 40ms; animation-duration: 760ms; }
+}
+/* Touch: a tap sets data-active, which plays the same interaction as hover. */
+  .computer-host[data-active="true"] .computer {
+    --computer-case-light: #f2e5ca;
+    --computer-case-dark: #ded0b4;
+    --computer-base-light: #d6c8ac;
+    --computer-base-dark: #c7b99e;
+    --computer-bezel: #cfc2a8;
+    --computer-glass-light: #303638;
+    --computer-glass-dark: #383d3d;
+    --computer-prompt: #04ed52;
+    --computer-detail: #343a3b;
+    --computer-slot: #bcaf95;
+    --computer-keys: #a69c87;
+  }
+  .computer-host[data-active="true"] .computer { transform: perspective(90px) rotateY(8deg) rotateX(-2deg); }
+  .computer-host[data-active="true"] .computer__monitor { transform: translateY(-2px) scale(.9); }
+  .computer-host[data-active="true"] .computer__keyboard { opacity: 1; transform: translateY(0) scale(1); }
+  .computer-host[data-active="true"] .computer__screen { animation: computer-power-on 520ms cubic-bezier(0.23, 1, 0.32, 1) 120ms backwards; }
+  .computer-host[data-active="true"] .computer__chevron { animation: computer-type-chevron 700ms steps(6, end) 120ms backwards; }
+  .computer-host[data-active="true"] .computer__cursor { animation: computer-blink 900ms steps(1) 700ms infinite; }
+  .computer-host[data-active="true"] .computer__keys > * { animation: computer-key-tap 380ms ease-in-out infinite; }
+  .computer-host[data-active="true"] .computer__keys > :nth-child(2) { animation-delay: 90ms; }
+  .computer-host[data-active="true"] .computer__keys > :nth-child(3) { animation-delay: 210ms; }
+  .computer-host[data-active="true"] .computer__keys > :nth-child(4) { animation-delay: 150ms; }
+  .computer-host[data-active="true"] .computer__keys > :nth-child(5) { animation-delay: 260ms; }
+  .computer-host[data-active="true"] .computer__keys > :nth-child(6) { animation-delay: 40ms; animation-duration: 760ms; }
+@media (prefers-reduced-motion: reduce) {
+  .computer__monitor, .computer__keyboard { transition: opacity 160ms ease; }
+  .computer__monitor, .computer-host:hover .computer__monitor, .computer-host[data-active="true"] .computer__monitor { transform: none; }
+  .computer__keyboard, .computer-host:hover .computer__keyboard, .computer-host[data-active="true"] .computer__keyboard { transform: none; }
+  .computer-host:hover .computer :is(.computer__screen, .computer__chevron, .computer__cursor, .computer__keys > *),
+  .computer-host[data-active="true"] .computer :is(.computer__screen, .computer__chevron, .computer__cursor, .computer__keys > *) { animation: none; }
+}
+
+/* Bolds on hover without reflowing the line: a hidden bold copy of the text reserves the wider width. */
+.hover-bold { display: inline-flex; flex-direction: column; transition: font-weight 200ms ease, color 300ms ease; }
+.hover-bold::after {
+  content: attr(data-text);
+  display: block;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 600;
+  pointer-events: none;
+}

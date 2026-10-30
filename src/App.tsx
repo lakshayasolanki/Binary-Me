@@ -11,6 +11,19 @@ import { ScrambleName } from "./components/ScrambleName";
 import { useEasedValue } from "./components/useEasedValue";
 
 
+import { ComputerIcon } from "./components/ComputerIcon";
+import { FallingLeavesIcon } from "./components/FallingLeavesIcon";
+import { BubblesIcon } from "./components/BubblesIcon";
+import { FlowerIcon } from "./components/FlowerIcon";
+
+// Switch the icon after "natural" here, with the box each one needs.
+const NATURAL_ICONS = {
+  flower: { Icon: FlowerIcon, box: "h-[1.3em] w-[0.94em] align-[-0.28em]" },
+  bubbles: { Icon: BubblesIcon, box: "h-[1.45em] w-[1.2em] align-[-0.18em]" },
+  leaves: { Icon: FallingLeavesIcon, box: "h-[1.45em] w-[1.2em] align-[-0.18em]" },
+};
+const { Icon: NaturalIcon, box: NATURAL_BOX } = NATURAL_ICONS.flower;
+
 const COLOR_STORAGE_KEY = "binary-color";
 const GLOW_STORAGE_KEY = "binary-glow";
 const HEX_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -58,7 +71,18 @@ function AppContent() {
   const [glowIntensity, setGlowIntensity] = useState(loadGlowIntensity);
   // Hovering the name pushes the crowd further out of focus and lifts the figure's glow a little.
   const [nameHovered, setNameHovered] = useState(false);
+  const [computerTapped, setComputerTapped] = useState(false);
   const nameBoost = useEasedValue(nameHovered ? 1 : 0);
+
+  // A touch outside the computer line turns the tapped state back off.
+  useEffect(() => {
+    if (!computerTapped) return;
+    const off = (e: PointerEvent) => {
+      if (!(e.target as Element).closest(".computer-host")) setComputerTapped(false);
+    };
+    document.addEventListener("pointerdown", off);
+    return () => document.removeEventListener("pointerdown", off);
+  }, [computerTapped]);
 
   useEffect(() => saveStored(COLOR_STORAGE_KEY, binaryColor), [binaryColor]);
   useEffect(() => {
@@ -96,8 +120,25 @@ function AppContent() {
             <Otter ref={otter} size={42} theme={theme} mat={false} />
           </span>
         </p>
-        <p>I have eyes which love to observe human-made things which feel natural.</p>
-        <p>I love computers, a machine that can think. So my eyes revolve around computers.</p>
+        <p>
+          I have eyes which love to observe human-made things which feel{" "}
+          <span className="leaves-host water-host group cursor-default whitespace-nowrap">
+            <span data-text="natural" className="hover-bold text-black dark:text-white transition-colors duration-300 group-hover:text-[#3342e0] dark:group-hover:text-[#8b98ff] group-hover:font-semibold group-has-[[data-live]]:text-[#3342e0] dark:group-has-[[data-live]]:text-[#8b98ff] group-has-[[data-live]]:font-semibold">natural</span>
+            <NaturalIcon className={`ml-[7px] inline-block ${NATURAL_BOX}`} />
+          </span>
+        </p>
+        <p>
+          I love{" "}
+          <span
+            className="computer-host group cursor-default whitespace-nowrap"
+            data-active={computerTapped ? "true" : undefined}
+            onPointerUp={(e) => { if (e.pointerType === "touch") setComputerTapped((on) => !on); }}
+          >
+            <span data-text="computers" className="hover-bold text-black dark:text-white transition-colors duration-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 group-hover:font-semibold group-data-[active=true]:text-emerald-600 dark:group-data-[active=true]:text-emerald-400 group-data-[active=true]:font-semibold">computers</span>
+            <ComputerIcon className="ml-1.5 inline-block h-[1.45em] w-[1.4em] align-[-0.3em]" />
+          </span>
+          , a machine that can think. So my eyes revolve around computers.
+        </p>
         <p>Primarily, at this moment, Its all about crafting detailed pixels.</p>
         <div className="flex items-center gap-3">
           <LanguageButton />
